@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Fragrances — Perfumes que dejan huella</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --black-soft: #111111;
+    --black-mid: #1a1a1a;
+    --teal: #1a5c5c;
+    --teal-light: #237070;
+    --teal-bright: #2a8a8a;
+    --teal-glow: rgba(26,92,92,0.25);
+    --platinum: #c8cdd4;
+    --platinum-light: #e2e6ea;
+    --platinum-dim: #8a9099;
+    --white: #f7f5f2;
+    --serif: 'Cormorant Garamond', Georgia, serif;
+    --sans: 'Montserrat', sans-serif;
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--white);
+    font-family: var(--sans);
+    font-weight: 300;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* Custom cursor */
+  .cursor {
+    position: fixed;
+    width: 8px; height: 8px;
+    background: var(--teal-bright);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transition: transform 0.1s ease;
+    mix-blend-mode: screen;
+  }
+  .cursor-ring {
+    position: fixed;
+    width: 32px; height: 32px;
+    border: 1px solid var(--platinum-dim);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transition: all 0.18s ease;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 1.5rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(to bottom, rgba(10,10,10,0.98), transparent);
+    transition: background 0.4s;
+  }
+  header.scrolled {
+    background: rgba(10,10,10,0.97);
+    border-bottom: 1px solid rgba(200,205,212,0.08);
+  }
+  .logo {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--white);
+    text-decoration: none;
+  }
+  .logo span { color: var(--teal-bright); }
+  nav { display: flex; gap: 2.5rem; }
+  nav a {
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--platinum-dim);
+    text-decoration: none;
+    transition: color 0.3s;
+    position: relative;
+  }
+  nav a::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 0;
+    width: 0; height: 1px;
+    background: var(--teal-bright);
+    transition: width 0.3s;
+  }
+  nav a:hover { color: var(--white); }
+  nav a:hover::after { width: 100%; }
+
+  /* ─── HERO ─── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: relative;
+    padding: 8rem 2rem 4rem;
+    overflow: hidden;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 50% 60%, rgba(26,92,92,0.18) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 20% 80%, rgba(26,92,92,0.08) 0%, transparent 60%),
+      linear-gradient(180deg, #0a0a0a 0%, #0d1515 50%, #0a0a0a 100%);
+  }
+
+  .hero-lines {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    opacity: 0.06;
+  }
+  .hero-lines::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 120vmax; height: 120vmax;
+    border: 1px solid var(--platinum);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: expand 8s ease-in-out infinite alternate;
+  }
+  .hero-lines::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 80vmax; height: 80vmax;
+    border: 1px solid var(--teal-bright);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: expand 8s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes expand {
+    from { transform: translate(-50%, -50%) scale(0.92); opacity: 0.5; }
+    to   { transform: translate(-50%, -50%) scale(1.08); opacity: 1; }
+  }
+
+  .hero-eyebrow {
+    position: relative;
+    font-size: 0.6rem;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: var(--teal-bright);
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 1s ease 0.3s forwards;
+  }
+  .hero-eyebrow::before, .hero-eyebrow::after {
+    content: '—';
+    margin: 0 0.8rem;
+    color: var(--teal);
+  }
+
+  .hero h1 {
+    position: relative;
+    font-family: var(--serif);
+    font-size: clamp(3.5rem, 8vw, 7rem);
+    font-weight: 300;
+    line-height: 1.05;
+    letter-spacing: 0.02em;
+    color: var(--white);
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 1.2s ease 0.5s forwards;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--platinum-light);
+  }
+
+  .hero-sub {
+    position: relative;
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--platinum-dim);
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeUp 1s ease 0.8s forwards;
+  }
+
+  .btn-primary {
+    position: relative;
+    display: inline-block;
+    padding: 1rem 3rem;
+    font-family: var(--sans);
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--white);
+    text-decoration: none;
+    border: 1px solid var(--teal);
+    background: transparent;
+    cursor: none;
+    overflow: hidden;
+    transition: color 0.4s, border-color 0.4s;
+    opacity: 0;
+    animation: fadeUp 1s ease 1s forwards;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--teal);
+    transform: translateX(-101%);
+    transition: transform 0.4s cubic-bezier(0.77,0,0.175,1);
+  }
+  .btn-primary:hover { color: var(--white); border-color: var(--teal-bright); }
+  .btn-primary:hover::before { transform: translateX(0); }
+  .btn-primary span { position: relative; z-index: 1; }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0;
+    animation: fadeIn 1s ease 1.5s forwards;
+  }
+  .hero-scroll span {
+    font-size: 0.55rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--platinum-dim);
+  }
+  .scroll-line {
+    width: 1px; height: 40px;
+    background: linear-gradient(to bottom, var(--teal-bright), transparent);
+    animation: scrollAnim 2s ease infinite;
+  }
+  @keyframes scrollAnim {
+    0% { transform: scaleY(0); transform-origin: top; }
+    50% { transform: scaleY(1); transform-origin: top; }
+    51% { transform: scaleY(1); transform-origin: bottom; }
+    100% { transform: scaleY(0); transform-origin: bottom; }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ─── DIVIDER ─── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 0 3rem;
+    margin: 1rem 0;
+  }
+  .divider-line { flex: 1; height: 1px; background: rgba(200,205,212,0.1); }
+  .divider-text {
+    font-size: 0.55rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--platinum-dim);
+  }
+
+  /* ─── PRODUCTS ─── */
+  .products-section {
+    padding: 5rem 2rem 6rem;
+    max-width: 1300px;
+    margin: 0 auto;
+  }
+
+  .category-block { margin-bottom: 5rem; }
+
+  .category-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2rem;
+    margin-bottom: 2.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(200,205,212,0.08);
+  }
+  .category-title {
+    font-family: var(--serif);
+    font-size: 2rem;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--white);
+  }
+  .category-emoji { font-size: 1.2rem; }
+  .category-count {
+    font-size: 0.6rem;
+    letter-spacing: 0.25em;
+    color: var(--teal-bright);
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1.5px;
+  }
+
+  .product-card {
+    background: var(--black-soft);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.5s cubic-bezier(0.23,1,0.32,1);
+    border: 1px solid rgba(200,205,212,0.05);
+  }
+  .product-card:hover { transform: translateY(-6px); z-index: 2; }
+
+  .product-image {
+    width: 100%;
+    aspect-ratio: 3/4;
+    background: var(--black-mid);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .product-image::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 40%, rgba(26,92,92,0.12) 0%, transparent 70%);
+    transition: opacity 0.4s;
+  }
+  .product-card:hover .product-image::before { opacity: 2; }
+
+  /* Perfume bottle placeholder illustration */
+  .bottle-svg {
+    width: 80px;
+    opacity: 0.7;
+    transition: opacity 0.4s, transform 0.5s;
+  }
+  .product-card:hover .bottle-svg {
+    opacity: 1;
+    transform: scale(1.05) translateY(-4px);
+  }
+
+  .product-overlay {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 60%;
+    background: linear-gradient(to top, rgba(10,10,10,0.9) 0%, transparent 100%);
+  }
+
+  .product-badge {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.7rem;
+    background: var(--teal);
+    color: var(--white);
+  }
+
+  .product-info {
+    padding: 1.5rem;
+    background: var(--black-soft);
+    border-top: 1px solid rgba(200,205,212,0.06);
+  }
+
+  .product-name {
+    font-family: var(--serif);
+    font-size: 1.25rem;
+    font-weight: 400;
+    color: var(--white);
+    margin-bottom: 0.4rem;
+    letter-spacing: 0.02em;
+  }
+
+  .product-brand {
+    font-size: 0.58rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--teal-bright);
+    margin-bottom: 0.75rem;
+  }
+
+  .product-desc {
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--platinum-dim);
+    margin-bottom: 1.25rem;
+    font-style: italic;
+    font-family: var(--serif);
+  }
+
+  .btn-buy {
+    display: block;
+    width: 100%;
+    padding: 0.8rem;
+    text-align: center;
+    font-family: var(--sans);
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--platinum-light);
+    text-decoration: none;
+    border: 1px solid rgba(200,205,212,0.15);
+    background: transparent;
+    transition: all 0.35s;
+    position: relative;
+    overflow: hidden;
+    cursor: none;
+  }
+  .btn-buy::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--teal);
+    transform: translateY(101%);
+    transition: transform 0.35s cubic-bezier(0.77,0,0.175,1);
+  }
+  .btn-buy span { position: relative; z-index: 1; }
+  .btn-buy:hover { color: var(--white); border-color: var(--teal); }
+  .btn-buy:hover::before { transform: translateY(0); }
+
+  /* ─── FOOTER ─── */
+  footer {
+    padding: 3rem;
+    text-align: center;
+    border-top: 1px solid rgba(200,205,212,0.06);
+  }
+  .footer-logo {
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--platinum-dim);
+    margin-bottom: 1rem;
+  }
+  .footer-text {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(138,144,153,0.5);
+    text-transform: uppercase;
+  }
+
+  /* ─── SCROLL REVEAL ─── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ─── MOBILE ─── */
+  @media (max-width: 768px) {
+    header { padding: 1.2rem 1.5rem; }
+    nav { display: none; }
+    .products-grid { grid-template-columns: repeat(2, 1fr); gap: 1px; }
+    .products-section { padding: 3rem 1rem; }
+    .divider { padding: 0 1.5rem; }
+  }
+  @media (max-width: 480px) {
+    .products-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- HEADER -->
+<header id="header">
+  <a href="#" class="logo">Aura <span>Fragrances</span></a>
+  <nav>
+    <a href="#productos">Colección</a>
+    <a href="#">Nosotros</a>
+    <a href="#">Contacto</a>
+  </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-lines"></div>
+  <p class="hero-eyebrow">Colección 2025</p>
+  <h1>Perfumes que<br><em>dejan huella</em></h1>
+  <p class="hero-sub">Descubre las fragancias más virales y elegantes</p>
+  <a href="#productos" class="btn-primary"><span>Ver perfumes</span></a>
+  <div class="hero-scroll">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<div class="divider">
+  <div class="divider-line"></div>
+  <span class="divider-text">Nuestra Selección</span>
+  <div class="divider-line"></div>
+</div>
+
+<!-- PRODUCTS -->
+<section class="products-section" id="productos">
+
+  <!-- Más virales -->
+  <div class="category-block reveal">
+    <div class="category-header">
+      <span class="category-emoji">🔥</span>
+      <h2 class="category-title">Más virales</h2>
+      <span class="category-count">4 fragancias</span>
+    </div>
+    <div class="products-grid">
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="28" y="8" width="24" height="10" rx="2" fill="#1a5c5c" opacity="0.8"/>
+            <rect x="34" y="2" width="12" height="8" rx="1" fill="#c8cdd4" opacity="0.6"/>
+            <rect x="18" y="18" width="44" height="110" rx="4" fill="#1a1a1a" stroke="#237070" stroke-width="1"/>
+            <rect x="22" y="22" width="36" height="102" rx="2" fill="url(#g1)" opacity="0.6"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="5" font-family="serif" opacity="0.8">CLUB DE NUIT</text>
+            <text x="40" y="90" text-anchor="middle" fill="#2a8a8a" font-size="4" font-family="sans-serif" opacity="0.9">INTENSE MAN</text>
+            <defs><linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity="0.3"/><stop offset="100%" stop-color="#0a0a0a" stop-opacity="0.1"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+          <span class="product-badge">Viral</span>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Armaf</p>
+          <h3 class="product-name">Club de Nuit Intense</h3>
+          <p class="product-desc">"Para el hombre que no necesita presentación."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="40" cy="15" rx="14" ry="6" fill="#c8cdd4" opacity="0.5"/>
+            <path d="M24 30 Q20 70 22 128 Q40 134 58 128 Q60 70 56 30 Z" fill="#0d1515" stroke="#2a8a8a" stroke-width="0.8"/>
+            <path d="M28 35 Q26 70 27 120 Q40 125 53 120 Q54 70 52 35 Z" fill="url(#g2)" opacity="0.5"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="5" font-family="serif" opacity="0.8">SAUVAGE</text>
+            <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity="0.4"/><stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Dior</p>
+          <h3 class="product-name">Sauvage EDT</h3>
+          <p class="product-desc">"Salvaje, libre, irresistible. El rey de los virales."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="22" y="20" width="36" height="108" rx="18" fill="#0d1515" stroke="#c8cdd4" stroke-width="0.6" stroke-opacity="0.4"/>
+            <rect x="26" y="24" width="28" height="100" rx="15" fill="url(#g3)" opacity="0.5"/>
+            <rect x="34" y="8" width="12" height="14" rx="2" fill="#1a5c5c"/>
+            <text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity="0.9">BLEU DE</text>
+            <text x="40" y="87" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity="0.9">CHANEL</text>
+            <defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#237070" stop-opacity="0.5"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+          <span class="product-badge">Top 3</span>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Chanel</p>
+          <h3 class="product-name">Bleu de Chanel</h3>
+          <p class="product-desc">"Sofisticación pura en cada gota."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="18" width="40" height="106" rx="3" fill="#111" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.3"/>
+            <rect x="24" y="22" width="32" height="98" rx="2" fill="url(#g4)" opacity="0.6"/>
+            <rect x="30" y="6" width="20" height="14" rx="1" fill="#c8cdd4" opacity="0.2"/>
+            <text x="40" y="75" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity="0.9">ACQUA DI</text>
+            <text x="40" y="84" text-anchor="middle" fill="#2a8a8a" font-size="4.5" font-family="serif" opacity="0.9">GIÒ</text>
+            <defs><linearGradient id="g4" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#1a5c5c" stop-opacity="0.4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Giorgio Armani</p>
+          <h3 class="product-name">Acqua di Giò</h3>
+          <p class="product-desc">"El mediterráneo embotellado. Fresco y eterno."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Para citas -->
+  <div class="category-block reveal">
+    <div class="category-header">
+      <span class="category-emoji">💘</span>
+      <h2 class="category-title">Para citas</h2>
+      <span class="category-count">3 fragancias</span>
+    </div>
+    <div class="products-grid">
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M30 20 L50 20 L58 40 L58 125 Q40 132 22 125 L22 40 Z" fill="#111" stroke="#2a8a8a" stroke-width="0.7"/>
+            <path d="M34 24 L46 24 L53 42 L53 120 Q40 126 27 120 L27 42 Z" fill="url(#g5)" opacity="0.5"/>
+            <rect x="33" y="8" width="14" height="14" rx="7" fill="#1a5c5c" opacity="0.8"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">1 MILLION</text>
+            <defs><linearGradient id="g5" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c8a84c" stop-opacity="0.2"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+          <span class="product-badge">Seductor</span>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Paco Rabanne</p>
+          <h3 class="product-name">1 Million</h3>
+          <p class="product-desc">"El aroma que convierte cada salida en una conquista."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="24" y="18" width="32" height="108" rx="16" fill="#0d1515" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.35"/>
+            <rect x="28" y="22" width="24" height="100" rx="13" fill="url(#g6)" opacity="0.6"/>
+            <rect x="35" y="8" width="10" height="12" rx="5" fill="#237070"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">INVICTUS</text>
+            <defs><linearGradient id="g6" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity="0.4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Paco Rabanne</p>
+          <h3 class="product-name">Invictus</h3>
+          <p class="product-desc">"Fresco, magnético, imposible de ignorar."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="20" width="40" height="105" rx="4" fill="#111" stroke="#2a8a8a" stroke-width="0.6"/>
+            <rect x="24" y="24" width="32" height="97" rx="3" fill="url(#g7)" opacity="0.5"/>
+            <rect x="32" y="8" width="16" height="14" rx="2" fill="#1a5c5c"/>
+            <text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity="0.9">LA NUIT</text>
+            <text x="40" y="85" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.7">DE L'HOMME</text>
+            <defs><linearGradient id="g7" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity="0.5"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Yves Saint Laurent</p>
+          <h3 class="product-name">La Nuit de L'Homme</h3>
+          <p class="product-desc">"Oscuro, cálido, adictivo. Para noches que no se olvidan."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Elegantes -->
+  <div class="category-block reveal">
+    <div class="category-header">
+      <span class="category-emoji">💎</span>
+      <h2 class="category-title">Elegantes</h2>
+      <span class="category-count">3 fragancias</span>
+    </div>
+    <div class="products-grid">
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="22" y="18" width="36" height="108" rx="2" fill="#111" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.4"/>
+            <line x1="22" y1="55" x2="58" y2="55" stroke="#c8cdd4" stroke-width="0.3" stroke-opacity="0.3"/>
+            <rect x="26" y="22" width="28" height="99" rx="1" fill="url(#g8)" opacity="0.4"/>
+            <rect x="30" y="6" width="20" height="14" rx="1" fill="#1a1a1a" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.4"/>
+            <text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">TOBACCO</text>
+            <text x="40" y="85" text-anchor="middle" fill="#2a8a8a" font-size="4" font-family="serif" opacity="0.9">VANILLE</text>
+            <defs><linearGradient id="g8" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c8a84c" stop-opacity="0.25"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+          <span class="product-badge">Premium</span>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Tom Ford</p>
+          <h3 class="product-name">Tobacco Vanille</h3>
+          <p class="product-desc">"Lujo en estado puro. Para quienes no necesitan explicar su gusto."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="40" cy="80" rx="22" ry="48" fill="#0d1515" stroke="#237070" stroke-width="0.7"/>
+            <ellipse cx="40" cy="80" rx="18" ry="44" fill="url(#g9)" opacity="0.5"/>
+            <rect x="34" y="8" width="12" height="30" rx="2" fill="#1a5c5c" opacity="0.7"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">OUD WOOD</text>
+            <defs><linearGradient id="g9" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity="0.3"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Tom Ford</p>
+          <h3 class="product-name">Oud Wood</h3>
+          <p class="product-desc">"Misterioso y profundo. Una fragancia que impone presencia."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="20" y="20" width="40" height="108" rx="20" fill="#111" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.3"/>
+            <rect x="24" y="24" width="32" height="100" rx="17" fill="url(#g10)" opacity="0.5"/>
+            <rect x="34" y="6" width="12" height="16" rx="6" fill="#1a5c5c"/>
+            <text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity="0.9">N°5</text>
+            <text x="40" y="88" text-anchor="middle" fill="#c8cdd4" font-size="3.5" font-family="serif" opacity="0.7">CHANEL</text>
+            <defs><linearGradient id="g10" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8cdd4" stop-opacity="0.15"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Chanel</p>
+          <h3 class="product-name">N°5 EDP</h3>
+          <p class="product-desc">"El perfume más icónico de la historia. Eterno."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Baratos que huelen caro -->
+  <div class="category-block reveal">
+    <div class="category-header">
+      <span class="category-emoji">💸</span>
+      <h2 class="category-title">Baratos que huelen caro</h2>
+      <span class="category-count">3 fragancias</span>
+    </div>
+    <div class="products-grid">
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="18" y="18" width="44" height="110" rx="3" fill="#111" stroke="#1a5c5c" stroke-width="1"/>
+            <rect x="22" y="22" width="36" height="102" rx="2" fill="url(#g11)" opacity="0.6"/>
+            <rect x="28" y="5" width="24" height="15" rx="2" fill="#1a5c5c" opacity="0.9"/>
+            <circle cx="40" cy="12" r="4" fill="#0a0a0a" stroke="#2a8a8a" stroke-width="0.5"/>
+            <text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">CDNIM</text>
+            <text x="40" y="88" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="sans-serif" opacity="0.8">ARMAF</text>
+            <defs><linearGradient id="g11" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity="0.4"/><stop offset="100%" stop-color="#111"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+          <span class="product-badge">Mejor precio</span>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Armaf</p>
+          <h3 class="product-name">Club de Nuit Man</h3>
+          <p class="product-desc">"Huele a Aventus. Cuesta una décima. Di que no."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="22" y="20" width="36" height="108" rx="5" fill="#111" stroke="#c8cdd4" stroke-width="0.5" stroke-opacity="0.25"/>
+            <rect x="26" y="24" width="28" height="100" rx="4" fill="url(#g12)" opacity="0.5"/>
+            <rect x="34" y="8" width="12" height="14" rx="1" fill="#1a1a1a" stroke="#c8cdd4" stroke-width="0.4" stroke-opacity="0.4"/>
+            <text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">LATTAFA</text>
+            <text x="40" y="86" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity="0.8">OUD FOR</text>
+            <text x="40" y="95" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity="0.8">GLORY</text>
+            <defs><linearGradient id="g12" x1="1" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#c8a84c" stop-opacity="0.2"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Lattafa</p>
+          <h3 class="product-name">Oud for Glory</h3>
+          <p class="product-desc">"Oriental, profundo. Nadie creerá el precio que pagaste."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-image">
+          <svg class="bottle-svg" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M26 22 Q40 16 54 22 L56 125 Q40 132 24 125 Z" fill="#0d1515" stroke="#237070" stroke-width="0.7"/>
+            <path d="M30 26 Q40 21 50 26 L51 120 Q40 126 29 120 Z" fill="url(#g13)" opacity="0.5"/>
+            <rect x="34" y="8" width="12" height="16" rx="2" fill="#1a5c5c"/>
+            <text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity="0.9">RASASI</text>
+            <text x="40" y="90" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity="0.8">LA YUQAWAM</text>
+            <defs><linearGradient id="g13" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity="0.4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs>
+          </svg>
+          <div class="product-overlay"></div>
+        </div>
+        <div class="product-info">
+          <p class="product-brand">Rasasi</p>
+          <h3 class="product-name">La Yuqawam</h3>
+          <p class="product-desc">"Fresco y especiado. El secreto mejor guardado del mundo árabe."</p>
+          <a href="#" class="btn-buy"><span>Comprar ahora</span></a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p class="footer-logo">Aura Fragrances</p>
+  <p class="footer-text">© 2025 — Todos los derechos reservados</p>
+</footer>
+
+<script>
+  // Custom cursor
+  const cursor = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  let mx = 0, my = 0, rx = 0, ry = 0;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cursor.style.left = mx - 4 + 'px';
+    cursor.style.top  = my - 4 + 'px';
+  });
+
+  (function animRing() {
+    rx += (mx - rx) * 0.12;
+    ry += (my - ry) * 0.12;
+    ring.style.left = rx + 'px';
+    ring.style.top  = ry + 'px';
+    requestAnimationFrame(animRing);
+  })();
+
+  document.querySelectorAll('a, button').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      cursor.style.transform = 'scale(2.5)';
+      ring.style.transform = 'translate(-50%,-50%) scale(1.5)';
+      ring.style.borderColor = 'var(--teal-bright)';
+    });
+    el.addEventListener('mouseleave', () => {
+      cursor.style.transform = 'scale(1)';
+      ring.style.transform = 'translate(-50%,-50%) scale(1)';
+      ring.style.borderColor = 'var(--platinum-dim)';
+    });
+  });
+
+  // Header scroll
+  const header = document.getElementById('header');
+  window.addEventListener('scroll', () => {
+    header.classList.toggle('scrolled', window.scrollY > 60);
+  });
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); }
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(r => observer.observe(r));
+</script>
+</body>
+</html>
