@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aura Fragrances — Perfumes que dejan huella</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --black:       #0a0a0a;
+  --black-soft:  #111111;
+  --black-mid:   #181818;
+  --teal:        #1a5c5c;
+  --teal-light:  #237070;
+  --teal-bright: #2a8a8a;
+  --platinum:    #c8cdd4;
+  --plat-dim:    #8a9099;
+  --white:       #f4f2ef;
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --sans:  'Montserrat', sans-serif;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { background:var(--black); color:var(--white); font-family:var(--sans); font-weight:300; overflow-x:hidden; }
+
+@media(pointer:fine){
+  body { cursor:none; }
+  .cursor      { position:fixed; width:7px; height:7px; background:var(--teal-bright); border-radius:50%; pointer-events:none; z-index:9999; transition:transform .1s; mix-blend-mode:screen; }
+  .cursor-ring { position:fixed; width:30px; height:30px; border:1px solid var(--plat-dim); border-radius:50%; pointer-events:none; z-index:9998; transition:all .16s ease; transform:translate(-50%,-50%); }
+}
+
+/* HEADER */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:200;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.85rem 1.5rem;
+  background:rgba(10,10,10,.97);
+  border-bottom:1px solid rgba(200,205,212,.07);
+  backdrop-filter:blur(8px);
+}
+.logo { font-family:var(--serif); font-size:1.2rem; font-weight:300; letter-spacing:.35em; text-transform:uppercase; text-decoration:none; color:var(--white); }
+.logo span { color:var(--teal-bright); }
+nav { display:flex; gap:1.8rem; }
+nav a { font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--plat-dim); text-decoration:none; transition:color .25s; }
+nav a:hover { color:var(--white); }
+@media(max-width:520px){ nav { display:none; } }
+
+/* HERO */
+.hero {
+  min-height:90vh; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; padding:7rem 1.5rem 3rem; position:relative; overflow:hidden;
+}
+.hero-bg {
+  position:absolute; inset:0;
+  background: radial-gradient(ellipse 70% 55% at 50% 65%, rgba(26,92,92,.22) 0%, transparent 70%),
+              linear-gradient(180deg,#0a0a0a 0%,#0d1515 55%,#0a0a0a 100%);
+}
+.hero-ring {
+  position:absolute; top:50%; left:50%; width:90vmax; height:90vmax;
+  border:1px solid rgba(42,138,138,.06); border-radius:50%;
+  transform:translate(-50%,-50%);
+  animation:pulse 7s ease-in-out infinite alternate;
+}
+@keyframes pulse { from{transform:translate(-50%,-50%) scale(.9);opacity:.4;} to{transform:translate(-50%,-50%) scale(1.05);opacity:1;} }
+
+.hero-eyebrow { position:relative; font-size:.58rem; letter-spacing:.5em; text-transform:uppercase; color:var(--teal-bright); margin-bottom:1.2rem; opacity:0; animation:fadeUp .9s ease .2s forwards; }
+.hero h1 { position:relative; font-family:var(--serif); font-size:clamp(2.8rem,7vw,6rem); font-weight:300; line-height:1.08; margin-bottom:1.2rem; opacity:0; animation:fadeUp 1s ease .4s forwards; }
+.hero h1 em { font-style:italic; color:var(--platinum); }
+.hero-sub { position:relative; font-size:.7rem; letter-spacing:.18em; text-transform:uppercase; color:var(--plat-dim); margin-bottom:2rem; opacity:0; animation:fadeUp .9s ease .6s forwards; }
+
+.hero-badges { position:relative; display:flex; gap:.6rem; flex-wrap:wrap; justify-content:center; margin-bottom:2.2rem; opacity:0; animation:fadeUp .9s ease .75s forwards; }
+.badge { font-size:.55rem; letter-spacing:.2em; text-transform:uppercase; padding:.3rem .85rem; border:1px solid rgba(42,138,138,.35); color:var(--teal-bright); border-radius:99px; }
+
+.btn-hero {
+  position:relative; display:inline-block; padding:.85rem 2.8rem;
+  font-size:.62rem; font-weight:500; letter-spacing:.35em; text-transform:uppercase;
+  color:var(--white); text-decoration:none; border:1px solid var(--teal);
+  background:transparent; overflow:hidden; transition:border-color .35s; border-radius:2px;
+  opacity:0; animation:fadeUp .9s ease .9s forwards;
+}
+.btn-hero::before { content:''; position:absolute; inset:0; background:var(--teal); transform:translateX(-101%); transition:transform .38s cubic-bezier(.77,0,.175,1); }
+.btn-hero:hover { border-color:var(--teal-bright); }
+.btn-hero:hover::before { transform:translateX(0); }
+.btn-hero span { position:relative; z-index:1; }
+
+@keyframes fadeUp { from{opacity:0;transform:translateY(22px);} to{opacity:1;transform:translateY(0);} }
+
+/* TRUST */
+.trust { background:var(--black-mid); border-top:1px solid rgba(200,205,212,.07); border-bottom:1px solid rgba(200,205,212,.07); padding:1rem 1.5rem; display:flex; gap:1.2rem; justify-content:center; flex-wrap:wrap; }
+.trust-item { display:flex; align-items:center; gap:.45rem; font-size:.58rem; letter-spacing:.15em; text-transform:uppercase; color:var(--plat-dim); }
+.trust-icon { color:var(--teal-bright); }
+
+/* TABS */
+.tabs-wrap { position:sticky; top:50px; z-index:150; background:rgba(10,10,10,.97); border-bottom:1px solid rgba(200,205,212,.07); backdrop-filter:blur(8px); padding:.75rem 1rem; }
+.tabs { display:flex; gap:.5rem; overflow-x:auto; max-width:1280px; margin:0 auto; scrollbar-width:none; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab-btn {
+  flex:1 1 0; min-width:130px;
+  padding:.9rem 1rem;
+  font-family:var(--sans); font-size:.65rem; font-weight:500; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--plat-dim);
+  background:var(--black-mid);
+  border:1px solid rgba(200,205,212,.1);
+  border-radius:4px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:color .25s, background .25s, border-color .25s, transform .15s;
+  display:flex; align-items:center; justify-content:center; gap:.55rem;
+}
+.tab-btn:hover { color:var(--white); background:#1e1e1e; border-color:rgba(200,205,212,.22); transform:translateY(-1px); }
+.tab-btn.active { color:var(--white); background:var(--teal); border-color:var(--teal-light); }
+.tab-icon { width:16px; height:16px; flex-shrink:0; opacity:.7; }
+.tab-btn.active .tab-icon { opacity:1; }
+@media(max-width:600px) {
+  .tabs-wrap { padding:.6rem .75rem; }
+  .tab-btn { min-width:110px; padding:.8rem .7rem; font-size:.58rem; }
+}
+
+/* SHOP */
+.shop { max-width:1280px; margin:0 auto; padding:2rem 1rem 5rem; }
+.category-section { display:none; }
+.category-section.active { display:block; }
+
+.cat-header { display:flex; align-items:center; gap:.9rem; margin-bottom:1.5rem; padding-bottom:.8rem; border-bottom:1px solid rgba(200,205,212,.08); }
+.cat-title { font-family:var(--serif); font-size:1.6rem; font-weight:300; font-style:italic; }
+.cat-emoji { font-size:1rem; }
+.cat-count { margin-left:auto; font-size:.55rem; letter-spacing:.25em; text-transform:uppercase; color:var(--teal-bright); }
+
+/* GRID */
+.products-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; }
+@media(max-width:900px) { .products-grid { grid-template-columns:repeat(3,1fr); } }
+@media(max-width:600px) { .products-grid { grid-template-columns:repeat(2,1fr); } }
+
+/* CARD */
+.card { background:var(--black-soft); border:1px solid rgba(200,205,212,.06); border-radius:6px; overflow:hidden; display:flex; flex-direction:column; transition:transform .35s cubic-bezier(.23,1,.32,1),border-color .35s; position:relative; }
+.card:hover { transform:translateY(-4px); border-color:rgba(42,138,138,.3); z-index:2; }
+
+.card-img { width:100%; aspect-ratio:1/1; background:var(--black-mid); display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; }
+.card-img::after { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 40%,rgba(26,92,92,.1) 0%,transparent 70%); transition:opacity .35s; }
+.card:hover .card-img::after { opacity:3; }
+
+.bottle { width:52%; max-width:88px; transition:transform .4s ease,opacity .35s; opacity:.75; }
+.card:hover .bottle { transform:translateY(-5px) scale(1.04); opacity:1; }
+
+.card-badge { position:absolute; top:.55rem; left:.55rem; font-size:.47rem; letter-spacing:.18em; text-transform:uppercase; padding:.22rem .58rem; background:var(--teal); color:var(--white); border-radius:2px; z-index:1; }
+
+.card-info { padding:.7rem .75rem .85rem; display:flex; flex-direction:column; gap:.3rem; flex:1; }
+.card-brand { font-size:.5rem; letter-spacing:.22em; text-transform:uppercase; color:var(--teal-bright); }
+.card-name { font-family:var(--serif); font-size:1rem; font-weight:400; line-height:1.2; }
+.card-tagline { font-size:.6rem; font-style:italic; font-family:var(--serif); color:var(--plat-dim); line-height:1.5; flex:1; }
+.card-price { font-size:.82rem; font-weight:500; color:var(--white); letter-spacing:.03em; }
+.card-price small { font-size:.56rem; font-weight:300; color:var(--plat-dim); text-decoration:line-through; margin-left:.35rem; }
+
+.btn-card { display:block; width:100%; padding:.58rem; text-align:center; font-size:.56rem; font-weight:500; letter-spacing:.25em; text-transform:uppercase; color:var(--platinum); text-decoration:none; border:1px solid rgba(200,205,212,.15); background:transparent; border-radius:3px; overflow:hidden; position:relative; transition:color .3s,border-color .3s; margin-top:.45rem; }
+.btn-card::before { content:''; position:absolute; inset:0; background:var(--teal); transform:translateY(101%); transition:transform .32s cubic-bezier(.77,0,.175,1); }
+.btn-card span { position:relative; z-index:1; }
+.btn-card:hover { color:var(--white); border-color:var(--teal); }
+.btn-card:hover::before { transform:translateY(0); }
+
+@media(max-width:600px) {
+  .card-info { padding:.58rem .62rem .72rem; gap:.26rem; }
+  .card-name { font-size:.88rem; }
+  .card-tagline { font-size:.57rem; }
+  .card-price { font-size:.76rem; }
+  .btn-card { padding:.52rem; font-size:.5rem; }
+}
+
+/* FOOTER */
+footer { padding:2rem 1.5rem; text-align:center; border-top:1px solid rgba(200,205,212,.06); }
+.footer-logo { font-family:var(--serif); font-size:1rem; letter-spacing:.4em; text-transform:uppercase; color:var(--plat-dim); margin-bottom:.5rem; }
+.footer-text { font-size:.55rem; letter-spacing:.18em; color:rgba(138,144,153,.45); text-transform:uppercase; }
+
+.reveal { opacity:0; transform:translateY(24px); transition:opacity .7s ease,transform .7s ease; }
+.reveal.visible { opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<header>
+  <a href="#" class="logo">Aura <span>Fragrances</span></a>
+  <nav>
+    <a href="#shop">Colección</a>
+    <a href="#">Guía</a>
+    <a href="#">Contacto</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-ring"></div>
+  <p class="hero-eyebrow">Selección 2025</p>
+  <h1>Perfumes que<br><em>dejan huella</em></h1>
+  <p class="hero-sub">Fragancias virales · Lujo accesible · Alta duración</p>
+  <div class="hero-badges">
+    <span class="badge">Árabes</span>
+    <span class="badge">Nicho</span>
+    <span class="badge">Clones de lujo</span>
+    <span class="badge">Envío rápido</span>
+  </div>
+  <a href="#shop" class="btn-hero"><span>Ver colección completa</span></a>
+</section>
+
+<div class="trust reveal">
+  <div class="trust-item"><span class="trust-icon">✦</span> Alta duración garantizada</div>
+  <div class="trust-item"><span class="trust-icon">✦</span> 100% originales</div>
+  <div class="trust-item"><span class="trust-icon">✦</span> Envío a todo Chile</div>
+</div>
+
+<div class="tabs-wrap" id="shop">
+  <div class="tabs">
+    <button class="tab-btn active" data-cat="virales">🔥 Más virales</button>
+    <button class="tab-btn" data-cat="lujo">💎 Huelen a lujo</button>
+    <button class="tab-btn" data-cat="citas">💘 Para citas</button>
+    <button class="tab-btn" data-cat="frescos">🌿 Frescos</button>
+  </div>
+</div>
+
+<div class="shop">
+
+  <!-- VIRALES -->
+  <section class="category-section active reveal" id="cat-virales">
+    <div class="cat-header"><span class="cat-emoji">🔥</span><h2 class="cat-title">Más virales</h2><span class="cat-count">6 fragancias</span></div>
+    <div class="products-grid">
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="28" y="8" width="24" height="10" rx="2" fill="#1a5c5c" opacity=".85"/><rect x="34" y="2" width="12" height="8" rx="1" fill="#c8cdd4" opacity=".5"/><rect x="18" y="18" width="44" height="110" rx="4" fill="#161616" stroke="#237070" stroke-width=".9"/><rect x="22" y="22" width="36" height="102" rx="2" fill="url(#b1)" opacity=".55"/><text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="5" font-family="serif" opacity=".85">CLUB DE NUIT</text><text x="40" y="86" text-anchor="middle" fill="#2a8a8a" font-size="4" font-family="sans-serif" opacity=".9">INTENSE MAN</text><circle cx="62" cy="26" r="3" fill="none" stroke="#c8cdd4" stroke-width=".5" opacity=".5"/><circle cx="18" cy="38" r="2.5" fill="none" stroke="#c8cdd4" stroke-width=".5" opacity=".5"/><defs><linearGradient id="b1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".35"/><stop offset="100%" stop-color="#0a0a0a" stop-opacity=".1"/></linearGradient></defs></svg>
+          <span class="card-badge">Viral #1</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Armaf</p>
+          <h3 class="card-name">Club de Nuit Intense</h3>
+          <p class="card-tagline">"El clon perfecto de Aventus."</p>
+          <p class="card-price">$18.990 <small>$32.000</small></p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="40" cy="14" rx="13" ry="5" fill="#c8cdd4" opacity=".4"/><path d="M25 28 Q21 72 23 126 Q40 133 57 126 Q59 72 55 28Z" fill="#0d1515" stroke="#2a8a8a" stroke-width=".7"/><path d="M29 33 Q27 72 28 118 Q40 124 52 118 Q53 72 51 33Z" fill="url(#b2)" opacity=".5"/><text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="5.5" font-family="serif" opacity=".85">SAUVAGE</text><defs><linearGradient id="b2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a" stop-opacity="0"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Dior</p>
+          <h3 class="card-name">Sauvage EDT</h3>
+          <p class="card-tagline">"El rey de los virales."</p>
+          <p class="card-price">$42.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="18" width="36" height="108" rx="18" fill="#0d1515" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".35"/><rect x="26" y="22" width="28" height="100" rx="15" fill="url(#b3)" opacity=".5"/><rect x="34" y="6" width="12" height="14" rx="2" fill="#1a5c5c"/><text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity=".9">BLEU DE</text><text x="40" y="86" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity=".9">CHANEL</text><defs><linearGradient id="b3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#237070" stop-opacity=".5"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Top 3</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Chanel</p>
+          <h3 class="card-name">Bleu de Chanel</h3>
+          <p class="card-tagline">"Sofisticación para toda ocasión."</p>
+          <p class="card-price">$68.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="18" width="40" height="108" rx="3" fill="#111" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".28"/><rect x="24" y="22" width="32" height="100" rx="2" fill="url(#b4)" opacity=".55"/><rect x="30" y="5" width="20" height="15" rx="1" fill="#1a1a1a" stroke="#c8cdd4" stroke-width=".4" stroke-opacity=".4"/><text x="40" y="75" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity=".9">ACQUA DI</text><text x="40" y="85" text-anchor="middle" fill="#2a8a8a" font-size="5" font-family="serif" opacity=".9">GIÒ</text><defs><linearGradient id="b4" x1="0" y1="1" x2="1" y2="0"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Giorgio Armani</p>
+          <h3 class="card-name">Acqua di Giò</h3>
+          <p class="card-tagline">"El mediterráneo embotellado."</p>
+          <p class="card-price">$55.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="20" width="36" height="106" rx="5" fill="#111" stroke="#2a8a8a" stroke-width=".6"/><rect x="26" y="24" width="28" height="98" rx="4" fill="url(#b5)" opacity=".5"/><rect x="34" y="7" width="12" height="15" rx="1" fill="#1a1a1a" stroke="#c8cdd4" stroke-width=".4" stroke-opacity=".4"/><text x="40" y="75" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">LATTAFA</text><text x="40" y="85" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity=".85">OUD FOR GLORY</text><defs><linearGradient id="b5" x1="1" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#c8a84c" stop-opacity=".2"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Precio</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Lattafa</p>
+          <h3 class="card-name">Oud for Glory</h3>
+          <p class="card-tagline">"Nadie creerá el precio que pagaste."</p>
+          <p class="card-price">$14.500 <small>$28.000</small></p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M26 22 Q40 16 54 22 L56 124 Q40 131 24 124Z" fill="#0d1515" stroke="#237070" stroke-width=".7"/><path d="M30 26 Q40 21 50 26 L51 119 Q40 125 29 119Z" fill="url(#b6)" opacity=".5"/><rect x="34" y="8" width="12" height="16" rx="2" fill="#1a5c5c"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">RASASI</text><text x="40" y="88" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity=".85">LA YUQAWAM</text><defs><linearGradient id="b6" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Rasasi</p>
+          <h3 class="card-name">La Yuqawam</h3>
+          <p class="card-tagline">"El secreto árabe mejor guardado."</p>
+          <p class="card-price">$16.900</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- LUJO -->
+  <section class="category-section reveal" id="cat-lujo">
+    <div class="cat-header"><span class="cat-emoji">💎</span><h2 class="cat-title">Huelen a lujo</h2><span class="cat-count">4 fragancias</span></div>
+    <div class="products-grid">
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="18" width="36" height="108" rx="2" fill="#111" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".4"/><line x1="22" y1="55" x2="58" y2="55" stroke="#c8cdd4" stroke-width=".3" stroke-opacity=".28"/><rect x="26" y="22" width="28" height="99" rx="1" fill="url(#c1)" opacity=".4"/><rect x="30" y="6" width="20" height="14" rx="1" fill="#1a1a1a" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".4"/><text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">TOBACCO</text><text x="40" y="86" text-anchor="middle" fill="#2a8a8a" font-size="4" font-family="serif" opacity=".9">VANILLE</text><defs><linearGradient id="c1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c8a84c" stop-opacity=".25"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Premium</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Tom Ford</p>
+          <h3 class="card-name">Tobacco Vanille</h3>
+          <p class="card-tagline">"Para quienes no explican su gusto."</p>
+          <p class="card-price">$95.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="40" cy="80" rx="22" ry="48" fill="#0d1515" stroke="#237070" stroke-width=".7"/><ellipse cx="40" cy="80" rx="18" ry="44" fill="url(#c2)" opacity=".5"/><rect x="34" y="8" width="12" height="30" rx="2" fill="#1a5c5c" opacity=".7"/><text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">OUD WOOD</text><defs><linearGradient id="c2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".3"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Tom Ford</p>
+          <h3 class="card-name">Oud Wood</h3>
+          <p class="card-tagline">"Misterioso. Impone presencia."</p>
+          <p class="card-price">$89.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="20" width="40" height="108" rx="20" fill="#111" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".3"/><rect x="24" y="24" width="32" height="100" rx="17" fill="url(#c3)" opacity=".5"/><rect x="34" y="6" width="12" height="16" rx="6" fill="#1a5c5c"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity=".9">N°5</text><text x="40" y="88" text-anchor="middle" fill="#c8cdd4" font-size="3.5" font-family="serif" opacity=".7">CHANEL</text><defs><linearGradient id="c3" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8cdd4" stop-opacity=".15"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Chanel</p>
+          <h3 class="card-name">N°5 EDP</h3>
+          <p class="card-tagline">"El más icónico de la historia."</p>
+          <p class="card-price">$72.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="18" width="36" height="108" rx="4" fill="#111" stroke="#2a8a8a" stroke-width=".6"/><rect x="26" y="22" width="28" height="100" rx="3" fill="url(#c4)" opacity=".5"/><rect x="33" y="6" width="14" height="14" rx="2" fill="#1a5c5c"/><text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">AVENTUS</text><text x="40" y="86" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity=".8">CREED</text><defs><linearGradient id="c4" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Nicho</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Creed</p>
+          <h3 class="card-name">Aventus</h3>
+          <p class="card-tagline">"El perfume de los hombres exitosos."</p>
+          <p class="card-price">$220.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- CITAS -->
+  <section class="category-section reveal" id="cat-citas">
+    <div class="cat-header"><span class="cat-emoji">💘</span><h2 class="cat-title">Para citas</h2><span class="cat-count">4 fragancias</span></div>
+    <div class="products-grid">
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M30 20 L50 20 L58 40 L58 124 Q40 131 22 124 L22 40Z" fill="#111" stroke="#2a8a8a" stroke-width=".7"/><path d="M34 24 L46 24 L53 42 L53 119 Q40 125 27 119 L27 42Z" fill="url(#d1)" opacity=".5"/><rect x="33" y="7" width="14" height="15" rx="7" fill="#1a5c5c" opacity=".8"/><text x="40" y="80" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">1 MILLION</text><defs><linearGradient id="d1" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c8a84c" stop-opacity=".2"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Seductor</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Paco Rabanne</p>
+          <h3 class="card-name">1 Million</h3>
+          <p class="card-tagline">"Convierte cada salida en conquista."</p>
+          <p class="card-price">$62.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="20" width="40" height="106" rx="4" fill="#111" stroke="#2a8a8a" stroke-width=".6"/><rect x="24" y="24" width="32" height="98" rx="3" fill="url(#d2)" opacity=".5"/><rect x="32" y="7" width="16" height="15" rx="2" fill="#1a5c5c"/><text x="40" y="74" text-anchor="middle" fill="#c8cdd4" font-size="4.5" font-family="serif" opacity=".9">LA NUIT</text><text x="40" y="84" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".7">DE L'HOMME</text><defs><linearGradient id="d2" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".5"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">YSL</p>
+          <h3 class="card-name">La Nuit de L'Homme</h3>
+          <p class="card-tagline">"Oscuro y adictivo. Noches inolvidables."</p>
+          <p class="card-price">$64.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><ellipse cx="40" cy="75" rx="20" ry="50" fill="#0d1515" stroke="#2a8a8a" stroke-width=".7"/><ellipse cx="40" cy="75" rx="16" ry="46" fill="url(#d3)" opacity=".5"/><rect x="35" y="8" width="10" height="20" rx="5" fill="#1a5c5c"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">GOOD GIRL</text><defs><linearGradient id="d3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".35"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Carolina Herrera</p>
+          <h3 class="card-name">Good Girl EDP</h3>
+          <p class="card-tagline">"Dulce y oscuro. Para romper corazones."</p>
+          <p class="card-price">$68.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="18" width="36" height="108" rx="3" fill="#111" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".3"/><rect x="26" y="22" width="28" height="100" rx="2" fill="url(#d4)" opacity=".5"/><rect x="32" y="6" width="16" height="14" rx="2" fill="#1a5c5c"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">BACCARAT</text><text x="40" y="88" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity=".85">ROUGE 540</text><defs><linearGradient id="d4" x1="1" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c8a84c" stop-opacity=".2"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Exclusivo</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">MFK</p>
+          <h3 class="card-name">Baccarat Rouge 540</h3>
+          <p class="card-tagline">"El más deseado del mundo."</p>
+          <p class="card-price">$185.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FRESCOS -->
+  <section class="category-section reveal" id="cat-frescos">
+    <div class="cat-header"><span class="cat-emoji">🌿</span><h2 class="cat-title">Frescos</h2><span class="cat-count">4 fragancias</span></div>
+    <div class="products-grid">
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="22" y="20" width="36" height="108" rx="5" fill="#0d1515" stroke="#2a8a8a" stroke-width=".7"/><rect x="26" y="24" width="28" height="100" rx="4" fill="url(#e1)" opacity=".55"/><rect x="34" y="7" width="12" height="15" rx="2" fill="#1a5c5c"/><text x="40" y="76" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">LIGHT BLUE</text><text x="40" y="86" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="sans-serif" opacity=".8">D&amp;G</text><defs><linearGradient id="e1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".5"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Dolce &amp; Gabbana</p>
+          <h3 class="card-name">Light Blue</h3>
+          <p class="card-tagline">"Mediterráneo, cítrico, perfecto."</p>
+          <p class="card-price">$45.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="20" y="18" width="40" height="108" rx="20" fill="#0d1515" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".3"/><rect x="24" y="22" width="32" height="100" rx="17" fill="url(#e2)" opacity=".5"/><rect x="34" y="6" width="12" height="14" rx="6" fill="#237070"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">COOL WATER</text><defs><linearGradient id="e2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".45"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+          <span class="card-badge">Precio</span>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Davidoff</p>
+          <h3 class="card-name">Cool Water</h3>
+          <p class="card-tagline">"Refrescante. Un clásico imperecedero."</p>
+          <p class="card-price">$22.000 <small>$38.000</small></p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M24 22 Q40 16 56 22 L54 126 Q40 132 26 126Z" fill="#0d1515" stroke="#237070" stroke-width=".7"/><path d="M28 26 Q40 21 52 26 L50 121 Q40 126 30 121Z" fill="url(#e3)" opacity=".5"/><rect x="35" y="8" width="10" height="16" rx="2" fill="#1a5c5c"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">GREEN IRISH</text><text x="40" y="88" text-anchor="middle" fill="#2a8a8a" font-size="3.5" font-family="serif" opacity=".8">TWEED</text><defs><linearGradient id="e3" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#1a5c5c" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Creed</p>
+          <h3 class="card-name">Green Irish Tweed</h3>
+          <p class="card-tagline">"El verde más elegante del mundo."</p>
+          <p class="card-price">$145.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-img">
+          <svg class="bottle" viewBox="0 0 80 140" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="24" y="18" width="32" height="108" rx="16" fill="#0d1515" stroke="#c8cdd4" stroke-width=".5" stroke-opacity=".3"/><rect x="28" y="22" width="24" height="100" rx="13" fill="url(#e4)" opacity=".6"/><rect x="35" y="7" width="10" height="13" rx="5" fill="#237070"/><text x="40" y="78" text-anchor="middle" fill="#c8cdd4" font-size="4" font-family="serif" opacity=".9">INVICTUS</text><defs><linearGradient id="e4" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2a8a8a" stop-opacity=".4"/><stop offset="100%" stop-color="#0a0a0a"/></linearGradient></defs></svg>
+        </div>
+        <div class="card-info">
+          <p class="card-brand">Paco Rabanne</p>
+          <h3 class="card-name">Invictus</h3>
+          <p class="card-tagline">"Fresco y magnético. Imposible ignorar."</p>
+          <p class="card-price">$58.000</p>
+          <a href="#" class="btn-card"><span>Ver aroma →</span></a>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <p class="footer-logo">Aura Fragrances</p>
+  <p class="footer-text">© 2025 — Todos los derechos reservados · Links de afiliado</p>
+</footer>
+
+<script>
+const cur=document.getElementById('cursor'), ring=document.getElementById('cursorRing');
+if(cur&&ring){
+  let mx=0,my=0,rx=0,ry=0;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=(mx-3.5)+'px';cur.style.top=(my-3.5)+'px';});
+  (function a(){rx+=(mx-rx)*.13;ry+=(my-ry)*.13;ring.style.left=rx+'px';ring.style.top=ry+'px';requestAnimationFrame(a);})();
+  document.querySelectorAll('a,button').forEach(el=>{
+    el.addEventListener('mouseenter',()=>{cur.style.transform='scale(2.5)';ring.style.borderColor='var(--teal-bright)';ring.style.transform='translate(-50%,-50%) scale(1.4)';});
+    el.addEventListener('mouseleave',()=>{cur.style.transform='scale(1)';ring.style.borderColor='var(--plat-dim)';ring.style.transform='translate(-50%,-50%) scale(1)';});
+  });
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.category-section').forEach(s=>s.classList.remove('active'));
+    btn.classList.add('active');
+    const t=document.getElementById('cat-'+btn.dataset.cat);
+    if(t){t.classList.add('active');t.classList.add('visible');}
+    document.getElementById('shop').scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+
+const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible');});},{threshold:.08});
+document.querySelectorAll('.reveal').forEach(r=>obs.observe(r));
+</script>
+</body>
+</html>
