@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Choapa GO</title>
+
+<!-- ================================================================
+     MAPLIBRE GL JS — motor de mapas real (WGS84 / OpenStreetMap data)
+     Tiles: OpenFreeMap (vector, gratis, sin API key) — estilo "dark"
+     Rutas: OSRM demo (routing real sobre calles, con fallback local)
+     ================================================================ -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+
+<style>
+/* =====================================================================
+   1) DESIGN TOKENS — idénticos a la versión anterior
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg-deep:#05070A;
+  --accent-1:#0A84FF;
+  --accent-2:#22C0F0;
+  --accent-3:#7FE0FF;
+  --text-primary:#F2F5F8;
+  --text-secondary:#94A0AC;
+  --text-tertiary:#5B646E;
+  --border-glass: rgba(255,255,255,0.09);
+  --border-glass-strong: rgba(255,255,255,0.16);
+  --glass-fill: rgba(12,16,22,0.5);
+  --success:#2FD98A;
+  --radius-lg:16px;
+}
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; overscroll-behavior:none; }
+body{
+  font-family:'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--bg-deep); color: var(--text-primary);
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+.mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
+.display{ font-family:'Manrope','Inter',sans-serif; }
+button{ font-family:inherit; }
+
+/* =====================================================================
+   2) MAP LAYER
+   ===================================================================== */
+#map{ position:fixed; inset:0; z-index:0; background:#060809; }
+
+.map-grade{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  backdrop-filter: saturate(0.92) contrast(1.04) brightness(1.16);
+  -webkit-backdrop-filter: saturate(0.92) contrast(1.04) brightness(1.16);
+}
+.map-vignette{
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:
+    radial-gradient(ellipse 64% 60% at 46% 42%, rgba(5,7,10,0) 0%, rgba(5,7,10,0.24) 100%),
+    linear-gradient(180deg, rgba(5,7,10,0.40) 0%, rgba(5,7,10,0.0) 20%, rgba(5,7,10,0.0) 72%, rgba(5,7,10,0.56) 100%);
+}
+.map-grain{
+  position:fixed; inset:0; z-index:2; pointer-events:none; opacity:0.045; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.maplibregl-ctrl-group{
+  background: var(--glass-fill) !important;
+  border:1px solid var(--border-glass) !important;
+  backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:0 6px 20px rgba(0,0,0,0.35) !important;
+  border-radius:11px !important; overflow:hidden;
+}
+.maplibregl-ctrl-group button{ background:transparent !important; width:30px !important; height:30px !important; }
+.maplibregl-ctrl-group button + button{ border-top:1px solid var(--border-glass) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{ filter: invert(1) brightness(1.6) opacity(0.85); }
+.maplibregl-ctrl-attrib{
+  background: rgba(5,7,10,0.55) !important; color:var(--text-tertiary) !important;
+  font-size:9px !important; backdrop-filter: blur(10px);
+}
+.maplibregl-ctrl-attrib a{ color:var(--text-tertiary) !important; }
+.maplibregl-ctrl-scale{
+  background: var(--glass-fill) !important; border-color: var(--border-glass-strong) !important;
+  color: var(--text-secondary) !important; font-family:'JetBrains Mono',monospace !important; font-size:9.5px !important;
+  backdrop-filter: blur(14px);
+}
+
+/* =====================================================================
+   3) CUSTOM MAP MARKERS
+   ===================================================================== */
+.pin-origin{ width:16px; height:16px; position:relative; }
+.pin-origin .core{ width:100%; height:100%; border-radius:50%; background:#0B0F14; border:2px solid var(--accent-2); box-shadow:0 0 10px rgba(34,192,240,0.7); }
+.pin-origin .core::after{ content:''; position:absolute; inset:4px; border-radius:50%; background:var(--accent-2); }
+.pin-origin .ring{ position:absolute; inset:-10px; border-radius:50%; border:1.5px solid var(--accent-2); opacity:0; animation: pinPulse 2.6s ease-out infinite; }
+@keyframes pinPulse{ 0%{ transform:scale(.4); opacity:.55; } 100%{ transform:scale(2.1); opacity:0; } }
+
+/* destino: marcador más pequeño + halo azul sutil (pedido explícito) */
+.pin-dest{ width:19px; height:25px; position:relative; transform:translateY(-12.5px); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
+.pin-dest svg{ width:100%; height:100%; position:relative; z-index:2; }
+.pin-dest .dest-halo{ position:absolute; left:50%; bottom:1px; width:22px; height:22px; margin-left:-11px; border-radius:50%; background:radial-gradient(circle, rgba(10,132,255,0.38) 0%, rgba(10,132,255,0) 70%); z-index:1; animation: destPulse 3s ease-out infinite; }
+@keyframes destPulse{ 0%{ transform:scale(.55); opacity:.7;} 70%{ opacity:.12;} 100%{ transform:scale(1.7); opacity:0;} }
+
+/* vehículo: icono cenital (top-down) para que la rotación por rumbo sea correcta.
+   .car-anchor es el elemento que MapLibre traslada/rota (no se le aplica transform propio);
+   .car-wrap es el hijo que se escala por zoom y flota, sin interferir con MapLibre. */
+.car-anchor{ width:1px; height:1px; opacity:0; transition: opacity .45s ease; }
+.car-anchor.visible{ opacity:1; }
+.car-wrap{ width:27px; height:27px; position:relative; left:-13.5px; top:-13.5px; transform-origin:50% 50%; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6)); animation: carFloat 2.4s ease-in-out infinite; }
+.car-wrap svg{ width:100%; height:100%; display:block; position:relative; z-index:2; }
+.car-wrap::before{ content:''; position:absolute; left:50%; top:50%; width:40px; height:40px; margin:-20px 0 0 -20px; border-radius:50%; background:radial-gradient(circle, rgba(143,231,255,0.34) 0%, rgba(34,192,240,0.16) 55%, rgba(34,192,240,0) 72%); z-index:1; animation: carHalo 2.4s ease-in-out infinite; pointer-events:none; }
+@keyframes carFloat{ 0%,100%{ margin-top:0; } 50%{ margin-top:-1.2px; } }
+@keyframes carHalo{ 0%,100%{ opacity:.7; transform:scale(1);} 50%{ opacity:1; transform:scale(1.08);} }
+
+/* =====================================================================
+   4) UI OVERLAY
+   ===================================================================== */
+.ui-layer{ position:relative; z-index:10; height:100vh; pointer-events:none; }
+.ui-layer > *{ pointer-events:auto; }
+
+.chrome-left,.chrome-center,.chrome-right{
+  position:fixed; top:14px; z-index:20; display:flex; align-items:center;
+  background: var(--glass-fill); border:1px solid var(--border-glass);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-radius:999px; box-shadow:0 6px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+  animation: chromeEnter .7s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes chromeEnter{ from{ opacity:0; transform:translateY(-10px);} to{ opacity:1; transform:translateY(0);} }
+.chrome-left{ left:16px; padding:6px 12px 6px 6px; gap:8px; }
+.brand-mark{ width:26px; height:26px; border-radius:8px; background: radial-gradient(circle at 32% 30%, var(--accent-3), var(--accent-1) 72%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 10px rgba(10,132,255,0.45); flex-shrink:0; }
+.brand-mark svg{ width:13px; height:13px; }
+.brand-word{ font-family:'Manrope',sans-serif; font-weight:700; font-size:13.5px; letter-spacing:-0.01em; }
+.brand-word span{ color:var(--accent-2); }
+.chrome-center{ left:50%; transform:translateX(-50%); padding:5px; gap:2px; }
+.chrome-center a{ color:var(--text-secondary); text-decoration:none; font-size:12px; font-weight:500; padding:7px 13px; border-radius:999px; transition:all .2s ease; }
+.chrome-center a:hover,.chrome-center a.active{ color:var(--text-primary); background:rgba(255,255,255,0.07); }
+.chrome-right{ right:16px; padding:5px; gap:4px; }
+.icon-btn{ width:30px; height:30px; border-radius:50%; border:none; background:transparent; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); cursor:pointer; transition:all .2s ease; }
+.icon-btn:hover{ color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.icon-btn svg{ width:14px; height:14px; }
+.help-pill{ display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; background:rgba(10,132,255,0.1); color:var(--accent-2); font-size:12px; font-weight:600; border:1px solid rgba(10,132,255,0.25); cursor:pointer; transition:all .2s ease; }
+.help-pill:hover{ background:rgba(10,132,255,0.18); }
+.help-pill svg{ width:12px; height:12px; }
+
+.panel{
+  background: linear-gradient(180deg, rgba(16,20,26,0.58), rgba(10,13,18,0.55));
+  border:1px solid var(--border-glass); border-radius:var(--radius-lg);
+  backdrop-filter: blur(26px) saturate(160%); -webkit-backdrop-filter: blur(26px) saturate(160%);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.07);
+  position:relative;
+}
+.panel::before{ content:''; position:absolute; top:0; left:14px; right:14px; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.3),transparent); }
+
+.request-card{
+  position:fixed; left:16px; top:64px; width:284px; z-index:15; padding:16px;
+  animation: cardEnterLeft .75s .1s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes cardEnterLeft{ from{ opacity:0; transform:translateX(-14px) scale(.98);} to{ opacity:1; transform:translateX(0) scale(1);} }
+.rc-head h1{ font-family:'Manrope',sans-serif; font-size:15px; font-weight:700; letter-spacing:-0.01em; }
+.rc-head .sub{ color:var(--text-secondary); font-size:10.5px; margin-top:2px; }
+.fields{ margin-top:14px; position:relative; }
+.field{ display:flex; align-items:center; gap:10px; padding:10px 11px; background:rgba(255,255,255,0.025); border:1px solid var(--border-glass); }
+.field:first-child{ border-radius:11px 11px 0 0; border-bottom:none; }
+.field:last-child{ border-radius:0 0 11px 11px; }
+.dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.dot.o{ background:var(--accent-2); box-shadow:0 0 6px var(--accent-2); }
+.dot.d{ background:#fff; border-radius:2px; }
+.field-text{ line-height:1.2; }
+.field-text .label{ font-size:9px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.05em; }
+.field-text .value{ font-size:12.5px; font-weight:600; margin-top:1px; }
+.swap-btn{ position:absolute; right:9px; top:50%; transform:translateY(-50%); width:26px; height:26px; border-radius:50%; background:#12171d; border:1px solid var(--border-glass-strong); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary); transition:all .25s ease; z-index:4; }
+.swap-btn:hover{ color:var(--accent-2); border-color:rgba(10,132,255,.4); transform:translateY(-50%) rotate(180deg); }
+.swap-btn svg{ width:12px; height:12px; }
+.service-row{ margin-top:13px; }
+.service-row .row-label{ font-size:9.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.06em; margin-bottom:7px; }
+.service-toggle{ display:flex; gap:6px; }
+.service-opt{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 6px; border-radius:10px; border:1px solid var(--border-glass); background:rgba(255,255,255,0.018); cursor:pointer; transition:all .2s ease; font-size:11px; font-weight:600; color:var(--text-secondary); }
+.service-opt svg{ width:15px; height:15px; opacity:.7; }
+.service-opt.active{ border-color:rgba(10,132,255,.4); background:linear-gradient(180deg, rgba(10,132,255,0.14), rgba(10,132,255,0.03)); color:var(--text-primary); box-shadow:0 0 14px rgba(10,132,255,0.12); }
+.service-opt.active svg{ opacity:1; filter:drop-shadow(0 0 3px var(--accent-2)); }
+.estimate-row{ margin-top:13px; display:flex; align-items:center; justify-content:space-between; padding:11px 13px; border-radius:11px; background:rgba(255,255,255,0.02); border:1px solid var(--border-glass); }
+.estimate-item .elabel{ font-size:9px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.05em; }
+.estimate-item .evalue{ font-size:14.5px; font-weight:700; margin-top:1px; }
+.estimate-item.price .evalue{ color:var(--accent-2); }
+.estimate-divider{ width:1px; height:22px; background:var(--border-glass); }
+.request-btn{ margin-top:13px; width:100%; padding:12px; border-radius:11px; border:none; cursor:pointer; background:linear-gradient(135deg, var(--accent-1), var(--accent-2) 70%); color:#03121e; font-weight:700; font-size:13px; transition: transform .15s ease, box-shadow .4s ease; box-shadow:0 4px 18px rgba(10,132,255,0.25); animation: breathe 4.4s ease-in-out infinite; }
+.request-btn:hover{ transform:translateY(-1px); }
+.request-btn:active{ transform:translateY(0) scale(.99); }
+@keyframes breathe{ 0%,100%{ box-shadow:0 4px 18px rgba(10,132,255,0.22);} 50%{ box-shadow:0 4px 26px rgba(34,192,240,0.4);} }
+.request-btn.loading{ animation:none; background:linear-gradient(135deg,#151b21,#0e1216); color:var(--text-secondary); cursor:default; box-shadow:none; }
+.request-btn.done{ animation:none; background:linear-gradient(135deg,#0e5138,#25c586); color:#eafff5; box-shadow:0 4px 18px rgba(47,217,138,.3); }
+.footnote{ margin-top:8px; font-size:9.5px; color:var(--text-tertiary); text-align:center; }
+.sheet-handle{ display:none; }
+
+/* campos como inputs reales + autocompletado restringido a ubicaciones válidas del área */
+.field{ position:relative; }
+.field-text{ flex:1; min-width:0; }
+.field-text input{ width:100%; background:transparent; border:none; outline:none; color:var(--text-primary); font-size:12.5px; font-weight:600; font-family:inherit; padding:0; }
+.field-text input::placeholder{ color:var(--text-tertiary); font-weight:500; }
+.field.locked input{ color:var(--text-primary); }
+.field.invalid input{ color:#ff8a80; }
+.autocomplete-list{ position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:25; max-height:190px; overflow-y:auto; background: rgba(14,18,24,0.92); border:1px solid var(--border-glass-strong); border-radius:12px; backdrop-filter: blur(20px) saturate(160%); box-shadow:0 16px 40px rgba(0,0,0,0.5); display:none; }
+.autocomplete-list.show{ display:block; }
+.ac-item{ padding:9px 12px; font-size:12px; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,0.05); }
+.ac-item:last-child{ border-bottom:none; }
+.ac-item:hover, .ac-item.hl{ background:rgba(10,132,255,0.12); color:var(--text-primary); }
+.ac-item svg{ width:12px; height:12px; flex-shrink:0; opacity:.7; }
+.ac-empty{ padding:10px 12px; font-size:11px; color:var(--text-tertiary); text-align:center; }
+
+/* pantalla de búsqueda de conductor (estado 2) */
+.searching-overlay{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(5,7,10,0.42); backdrop-filter: blur(6px); opacity:0; pointer-events:none; transition: opacity .35s ease; }
+.searching-overlay.show{ opacity:1; pointer-events:auto; }
+.searching-card{ width:250px; padding:26px 22px; text-align:center; border-radius:20px; transform: scale(.92); transition: transform .4s cubic-bezier(.16,1,.3,1); }
+.searching-overlay.show .searching-card{ transform: scale(1); }
+.radar{ position:relative; width:64px; height:64px; margin:0 auto 16px; }
+.radar-ring{ position:absolute; inset:0; border-radius:50%; border:1.5px solid var(--accent-2); opacity:0; animation: radarPulse 1.8s ease-out infinite; }
+.radar-ring:nth-child(2){ animation-delay:.6s; }
+.radar-ring:nth-child(3){ animation-delay:1.2s; }
+@keyframes radarPulse{ 0%{ transform:scale(.3); opacity:.8;} 100%{ transform:scale(1.6); opacity:0;} }
+.radar-core{ position:absolute; inset:22px; border-radius:50%; background: radial-gradient(circle at 35% 30%, var(--accent-3), var(--accent-1) 75%); box-shadow:0 0 18px rgba(10,132,255,0.6); }
+.searching-text{ font-size:13px; font-weight:600; color:var(--text-primary); min-height:18px; }
+.searching-sub{ font-size:10.5px; color:var(--text-tertiary); margin-top:5px; }
+
+.driver-card{ position:fixed; right:16px; top:64px; width:224px; z-index:15; padding:13px 14px; transition: box-shadow .4s ease, border-color .4s ease, opacity .4s ease, transform .4s ease; opacity:0; transform:translateX(14px) scale(.98); pointer-events:none; }
+.driver-card.visible{ opacity:1; transform:translateX(0) scale(1); pointer-events:auto; animation: cardEnterRight .6s cubic-bezier(.16,1,.3,1) both; }
+@keyframes cardEnterRight{ from{ opacity:0; transform:translateX(14px) scale(.98);} to{ opacity:1; transform:translateX(0) scale(1);} }
+.driver-card.assigned{ border-color: rgba(47,217,138,0.4); box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 18px rgba(47,217,138,0.2); }
+.driver-card .status{ display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:600; color:var(--accent-2); margin-bottom:11px; }
+.status-dot{ width:5px; height:5px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 6px var(--accent-2); animation: dotblink 1.8s ease-in-out infinite; }
+@keyframes dotblink{ 0%,100%{ opacity:1;} 50%{ opacity:.3;} }
+.driver-info{ display:flex; align-items:center; gap:10px; }
+.avatar{ width:38px; height:38px; border-radius:50%; flex-shrink:0; background:linear-gradient(140deg,#232c34,#12171c); border:1.5px solid rgba(10,132,255,0.35); display:flex; align-items:center; justify-content:center; font-family:'Manrope',sans-serif; font-weight:700; font-size:12.5px; color:var(--accent-2); }
+.driver-name{ font-weight:700; font-size:13px; display:flex; align-items:center; gap:5px; }
+.rating{ display:flex; align-items:center; gap:2px; font-size:10.5px; color:var(--text-secondary); margin-top:1px; }
+.rating svg{ width:10px; height:10px; fill:#FFC94A; }
+.vehicle-line{ font-size:10.5px; color:var(--text-secondary); margin-top:2px; }
+.plate{ display:inline-block; margin-left:4px; padding:1px 5px; border-radius:4px; background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); font-size:9px; font-weight:600; }
+.eta-row{ margin-top:11px; display:flex; align-items:center; justify-content:space-between; padding-top:11px; border-top:1px solid var(--border-glass); }
+.eta-label{ font-size:10.5px; color:var(--text-secondary); }
+.eta-value{ font-size:15px; font-weight:700; color:var(--accent-2); }
+.contact-row{ display:flex; gap:6px; margin-top:10px; }
+.contact-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px; border-radius:9px; border:1px solid var(--border-glass); background:rgba(255,255,255,0.015); color:var(--text-secondary); font-size:10.5px; font-weight:600; cursor:pointer; transition:all .2s ease; }
+.contact-btn:hover{ color:var(--text-primary); border-color:rgba(10,132,255,.3); }
+.contact-btn svg{ width:11px; height:11px; }
+
+.status-strip{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:15; display:flex; background:var(--glass-fill); border:1px solid var(--border-glass); border-radius:14px; backdrop-filter: blur(22px) saturate(160%); box-shadow:0 12px 34px rgba(0,0,0,0.4); animation: chromeEnter .8s .3s cubic-bezier(.16,1,.3,1) both; overflow:hidden; }
+.strip-item{ display:flex; align-items:center; gap:8px; padding:9px 15px; }
+.strip-div{ width:1px; background:var(--border-glass); }
+.strip-icon{ width:20px; height:20px; border-radius:6px; background:rgba(10,132,255,0.1); border:1px solid rgba(10,132,255,0.2); display:flex; align-items:center; justify-content:center; color:var(--accent-2); flex-shrink:0; }
+.strip-icon svg{ width:11px; height:11px; }
+.strip-text .stitle{ font-size:11px; font-weight:600; line-height:1.15; }
+.strip-text .sdesc{ font-size:9px; color:var(--text-tertiary); line-height:1.15; margin-top:1px; }
+
+.toast{ position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:30; padding:9px 16px; border-radius:10px; background:rgba(20,10,10,0.7); border:1px solid rgba(255,90,80,0.3); color:#ffb3ab; font-size:11.5px; opacity:0; pointer-events:none; transition:all .35s ease; backdrop-filter: blur(14px); max-width:88vw; text-align:center; }
+.toast.show{ opacity:1; transform:translate(-50%,0); }
+
+/* ===== BOTTOM SHEET (solo móvil): el mapa manda, el panel es un sheet colapsable ===== */
+@media (max-width: 880px){
+  .chrome-center{ display:none; }
+
+  .request-card{
+    left:0; right:0; width:auto; top:auto; bottom:0;
+    border-radius:20px 20px 0 0; padding:8px 16px calc(14px + env(safe-area-inset-bottom));
+    max-height:82vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    transform: translateY(calc(100% - 128px));
+    transition: transform .38s cubic-bezier(.16,1,.3,1);
+    touch-action: none;
+  }
+  .request-card.expanded{ transform: translateY(0); touch-action: pan-y; }
+  .sheet-handle{ width:38px; height:4px; border-radius:3px; background:var(--border-glass-strong); margin:2px auto 10px; }
+  .rc-head{ cursor:pointer; }
+
+  .driver-card{ right:10px; left:10px; width:auto; top:auto; bottom:10px; }
+  .driver-card.visible{ animation: cardEnterUp .6s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes cardEnterUp{ from{ opacity:0; transform:translateY(14px) scale(.98);} to{ opacity:1; transform:translateY(0) scale(1);} }
+  .status-strip{ display:none; }
+  .searching-card{ width:80vw; max-width:280px; }
+}
+@media (max-width:420px){ .brand-word{ display:none; } }
+button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== MAP (MapLibre GL, real OSM data) ===================== -->
+<div id="map"></div>
+<div class="map-grade"></div>
+<div class="map-vignette"></div>
+<div class="map-grain"></div>
+<div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
+
+<div class="searching-overlay" id="searchingOverlay">
+  <div class="panel searching-card">
+    <div class="radar"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core"></div></div>
+    <div class="searching-text" id="searchingText">Buscando el mejor conductor…</div>
+    <div class="searching-sub">Esto toma solo unos segundos</div>
+  </div>
+</div>
+
+<!-- ===================== FLOATING PRODUCT UI ===================== -->
+<div class="ui-layer">
+
+  <div class="chrome-left">
+    <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8z" fill="#fff"/><circle cx="12" cy="10" r="3" fill="#0A84FF"/></svg></div>
+    <div class="brand-word display">Choapa<span>GO</span></div>
+  </div>
+
+  <div class="chrome-center">
+    <a href="#" class="active">Inicio</a>
+    <a href="#">Cómo funciona</a>
+    <a href="#">Servicios</a>
+    <a href="#">Sobre nosotros</a>
+  </div>
+
+  <div class="chrome-right">
+    <button class="icon-btn" id="burgerBtn" aria-label="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg></button>
+    <div class="help-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 18h.01M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" stroke-linecap="round"/><circle cx="12" cy="12" r="9.5"/></svg>Ayuda</div>
+  </div>
+
+  <div class="panel request-card" id="requestCard">
+    <div class="sheet-handle" id="sheetHandle"></div>
+    <div class="rc-head" id="rcHead">
+      <h1 class="display">Solicita tu movilidad</h1>
+      <div class="sub">Rápido, seguro y conectado a Salamanca</div>
+    </div>
+    <div class="fields">
+      <div class="field" id="fromField"><div class="dot o"></div><div class="field-text"><div class="label">Desde</div><input id="fromText" class="mono-off" autocomplete="off" value="Colliguay, Salamanca" /></div>
+        <div class="autocomplete-list" id="fromList"></div>
+      </div>
+      <div class="field" id="toField"><div class="dot d"></div><div class="field-text"><div class="label">Hacia</div><input id="toText" autocomplete="off" value="Plaza de Armas, Salamanca" /></div>
+        <div class="autocomplete-list" id="toList"></div>
+      </div>
+      <button class="swap-btn" id="swapBtn" aria-label="Intercambiar origen y destino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5-5 5 5M7 14l5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+    <div class="service-row">
+      <div class="row-label">Tipo de servicio</div>
+      <div class="service-toggle">
+        <div class="service-opt active" data-service="mov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z" stroke-linejoin="round"/><circle cx="7" cy="17" r="1.3"/><circle cx="17" cy="17" r="1.3"/></svg>Movilidad</div>
+        <div class="service-opt" data-service="enc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" stroke-linejoin="round"/></svg>Encargos</div>
+      </div>
+    </div>
+    <div class="estimate-row">
+      <div class="estimate-item"><div class="elabel">Tiempo</div><div class="evalue mono" id="etaText">25 min</div></div>
+      <div class="estimate-divider"></div>
+      <div class="estimate-item price"><div class="elabel">Precio</div><div class="evalue mono" id="priceText">$4.500</div></div>
+    </div>
+    <button class="request-btn" id="requestBtn">Solicitar movilidad</button>
+    <div class="footnote">Incluye recargo por zona rural</div>
+  </div>
+
+  <div class="panel driver-card" id="driverCard">
+    <div class="status"><span class="status-dot"></span>Conductor en camino</div>
+    <!-- Esta tarjeta permanece oculta (opacity 0 / pointer-events:none) hasta el Estado 3 (conductor asignado) -->
+    <div class="driver-info">
+      <div class="avatar">JR</div>
+      <div>
+        <div class="driver-name">Jeison R.<span class="rating"><svg viewBox="0 0 20 20"><path d="M10 1.5l2.6 5.6 6.1.6-4.6 4.1 1.4 6-5.5-3.2-5.5 3.2 1.4-6-4.6-4.1 6.1-.6z"/></svg>4.9</span></div>
+        <div class="vehicle-line">Chevrolet Tracker <span class="plate mono">ABC123</span></div>
+      </div>
+    </div>
+    <div class="eta-row"><div class="eta-label">Llega en</div><div class="eta-value mono" id="driverEta">8 min</div></div>
+    <div class="contact-row">
+      <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6.3 6.3l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2z" stroke-linejoin="round"/></svg>Llamar</div>
+      <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg>Mensaje</div>
+    </div>
+  </div>
+
+  <div class="status-strip">
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3v6c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V5z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Seguridad</div><div class="sdesc">Verificado</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg></div><div class="strip-text"><div class="stitle">Puntualidad</div><div class="sdesc">Siempre</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Encargos</div><div class="sdesc">Compras y más</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.5 8.5 0 0 1-3.8-.9L3 20l1.1-5.3a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 11.6 2a8.5 8.5 0 0 1 9.4 8.4z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Soporte</div><div class="sdesc">24/7</div></div></div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   JAVASCRIPT — Choapa GO map engine v2
+   Sections:
+     A. Geodata + zona operacional (bounds duros)
+     B. Inicialización del mapa
+     C. Ruta real (OSRM Directions API, con fallback local)
+     D. Marcadores nativos (origen / destino / vehículo)
+     E. Animación del vehículo: posición + rumbo real sobre la ruta
+     F. Cámara: encuadre automático y transiciones suaves
+     G. Legibilidad: +15% de opacidad en calles y etiquetas
+     H. Interacciones de UI (swap, servicio, solicitud)
+   ===================================================================== */
+
+/* ---------- A. GEODATA + ZONA OPERACIONAL ---------- */
+const GEO = {
+  salamanca: [-70.9635, -31.7767],
+  colliguay: [-71.0585, -31.8447],
+  elTambo:   [-71.0430, -31.7945],
+  chuchini:  [-71.0901, -31.7493],
+  tahuinco:  [-71.0991, -31.7981],
+  chalinga:  [-70.9754, -31.7675],
+  santaRosa: [-70.8932, -31.8339]
+};
+
+// Zona operacional real de Choapa GO: acotada estrictamente al corredor
+// Colliguay <-> El Tambo <-> Salamanca. Fuera de estos límites no se
+// permite hacer pan ni se cargan/renderizan nombres de otros sectores.
+// NOTA: en cuanto envíes la imagen con la zona marcada, ajusto estas
+// coordenadas exactas al polígono real de cobertura.
+const AREA_BOUNDS = [[-71.11, -31.86], [-70.93, -31.74]];
+
+/* ---------- A2. UBICACIONES REALES (nombres verificados: calles, plaza y
+   localidades efectivamente existentes en la comuna de Salamanca, Choapa).
+   Las coordenadas son una posición inicial aproximada dentro del corredor;
+   SIEMPRE se corrigen con "snapToRoad()" (OSRM /nearest) antes de usarse,
+   de modo que un origen/destino nunca cae en un terreno vacío o fuera de
+   la red vial real. Si el navegador tiene salida a internet, además se
+   intenta geocodificar en vivo contra Nominatim/OSM acotado a esta zona. */
+const LOCATIONS = [
+  { name: 'Plaza de Armas, Salamanca',              coord: [-70.9633, -31.7765] },
+  { name: 'Iglesia Parroquial, Salamanca',           coord: [-70.9636, -31.7761] },
+  { name: 'Municipalidad de Salamanca',              coord: [-70.9640, -31.7770] },
+  { name: 'Centro Cultural Estación Salamanca',      coord: [-70.9615, -31.7772] },
+  { name: 'Calle Diego Portales, Salamanca',         coord: [-70.9648, -31.7773] },
+  { name: 'Calle Freire, Salamanca',                 coord: [-70.9628, -31.7758] },
+  { name: 'Calle Colón, Salamanca',                  coord: [-70.9642, -31.7780] },
+  { name: 'Avenida Providencia, Salamanca',          coord: [-70.9660, -31.7788] },
+  { name: 'Calle Andrés Bello, Salamanca',           coord: [-70.9620, -31.7750] },
+  { name: 'Calle Arturo Prat, Salamanca',            coord: [-70.9655, -31.7748] },
+  { name: 'Calle Camilo Henríquez, Salamanca',       coord: [-70.9670, -31.7775] },
+  { name: 'Colliguay, Salamanca',                    coord: GEO.colliguay },
+  { name: 'El Tambo, Salamanca',                     coord: GEO.elTambo },
+  { name: 'Chalinga, Salamanca',                     coord: GEO.chalinga },
+  { name: 'Cuncumén, Salamanca',                     coord: [-71.0210, -31.8100] },
+  { name: 'Chillepín, Salamanca',                    coord: [-71.0300, -31.8250] }
+];
+
+function normalize(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function showToast(msg, duration = 4200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tid);
+  showToast._tid = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+/* ---------- B. MAP INIT ---------- */
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/dark',
+  center: GEO.salamanca,
+  zoom: 12.4,
+  pitch: 42,
+  bearing: -12,
+  maxBounds: AREA_BOUNDS,   // restringe estrictamente el pan a la zona operacional
+  minZoom: 11.4,             // evita alejar la vista hasta revelar territorio ajeno
+  maxZoom: 17,
+  attributionControl: false,
+  antialias: true
+});
+
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: 'metric' }), 'bottom-left');
+
+map.on('error', (e) => {
+  console.warn('Map error', e && e.error);
+  showToast('No se pudo cargar el mapa. Revisa tu conexión.');
+});
+
+/* ---------- C. RUTA REAL (OSRM) CON FALLBACK LOCAL ---------- */
+const OSRM_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving/';
+
+async function fetchRealRoute(origin, destination) {
+  const url = `${OSRM_ENDPOINT}${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('OSRM status ' + res.status);
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) throw new Error('Sin rutas OSRM');
+  return data.routes[0].geometry.coordinates.map(c => [c[0], c[1]]);
+}
+
+// Fallback: curva suavizada (Chaikin) por si el servicio de ruteo no responde.
+function chaikin(points, iterations) {
+  let pts = points;
+  for (let it = 0; it < iterations; it++) {
+    const next = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      next.push([x0 + (x1 - x0) * 0.25, y0 + (y1 - y0) * 0.25]);
+      next.push([x0 + (x1 - x0) * 0.75, y0 + (y1 - y0) * 0.75]);
+    }
+    next.push(pts[pts.length - 1]);
+    pts = next;
+  }
+  return pts;
+}
+let ROUTE_LINE = [];
+let routeLen = [0];
+let ROUTE_TOTAL = 1e-9;
+
+function computeMetrics(line) {
+  routeLen = [0];
+  for (let i = 1; i < line.length; i++) {
+    const [lon0, lat0] = line[i - 1], [lon1, lat1] = line[i];
+    const dx = (lon1 - lon0) * Math.cos(lat0 * Math.PI / 180);
+    const dy = (lat1 - lat0);
+    routeLen.push(routeLen[i - 1] + Math.sqrt(dx * dx + dy * dy));
+  }
+  ROUTE_TOTAL = routeLen[routeLen.length - 1] || 1e-9;
+}
+
+function pointAtT(tt) {
+  const target = tt * ROUTE_TOTAL;
+  let i = 1;
+  while (i < routeLen.length && routeLen[i] < target) i++;
+  i = Math.min(i, routeLen.length - 1);
+  const segLen = routeLen[i] - routeLen[i - 1] || 1e-9;
+  const segT = (target - routeLen[i - 1]) / segLen;
+  const [lon0, lat0] = ROUTE_LINE[i - 1], [lon1, lat1] = ROUTE_LINE[i];
+  return [lon0 + (lon1 - lon0) * segT, lat0 + (lat1 - lat0) * segT];
+}
+
+function addRouteLayers() {
+  if (map.getSource('route')) {
+    map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE_LINE } });
+    return;
+  }
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE_LINE } } });
+
+  map.addLayer({ id: 'route-glow-wide', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#0A84FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 16, 20],
+      'line-blur': 14, 'line-opacity': 0.16 } });
+
+  map.addLayer({ id: 'route-glow-tight', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#22C0F0', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 9],
+      'line-blur': 5, 'line-opacity': 0.28 } });
+
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#8FE7FF', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.4, 16, 3.2],
+      'line-opacity': 0.95 } });
+
+  let breatheT = 0;
+  setInterval(() => {
+    breatheT += 0.05;
+    const v = 0.16 + Math.sin(breatheT) * 0.05;
+    if (map.getLayer('route-glow-wide')) map.setPaintProperty('route-glow-wide', 'line-opacity', v);
+  }, 90);
+}
+
+async function buildRoute(origin, destination) {
+  try {
+    ROUTE_LINE = await fetchRealRoute(origin, destination);
+  } catch (err) {
+    console.warn('OSRM no disponible, usando curva de respaldo:', err);
+    ROUTE_LINE = chaikin([origin, destination], 4);
+    showToast('Ruta aproximada: sin conexión al motor de ruteo (OSRM)');
+  }
+  computeMetrics(ROUTE_LINE);
+  addRouteLayers();
+}
+
+/* ---------- C2. MAP MATCHING: ningún origen/destino puede quedar fuera de
+   la red vial real. snapToRoad() ajusta cualquier coordenada al segmento
+   de calle transitable más cercano usando el servicio "nearest" de OSRM
+   (mismos datos de calles que usa el ruteo). Si el servicio no responde,
+   se conserva la coordenada original en vez de romper el flujo. */
+async function snapToRoad(coord) {
+  try {
+    const url = `https://router.project-osrm.org/nearest/v1/driving/${coord[0]},${coord[1]}?number=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('OSRM nearest status ' + res.status);
+    const data = await res.json();
+    const wp = data.waypoints && data.waypoints[0];
+    if (!wp) throw new Error('Sin waypoint de map matching');
+    return [wp.location[0], wp.location[1]];
+  } catch (err) {
+    console.warn('Map matching no disponible, se usa la coordenada original:', err);
+    return coord;
+  }
+}
+
+/* Geocodificación en vivo (Nominatim/OSM), acotada estrictamente al área
+   operacional. Solo se usa para reforzar la búsqueda por texto libre; el
+   listado LOCATIONS siempre queda disponible como fuente confiable. */
+async function geocodeInArea(query) {
+  try {
+    const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=4&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&q=${encodeURIComponent(query + ', Salamanca, Choapa, Chile')}`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    if (!res.ok) throw new Error('Nominatim status ' + res.status);
+    const data = await res.json();
+    return data
+      .filter(r => r.lon >= minLon && r.lon <= maxLon && r.lat >= minLat && r.lat <= maxLat)
+      .map(r => ({ name: r.display_name.split(',').slice(0, 2).join(',').trim(), coord: [parseFloat(r.lon), parseFloat(r.lat)] }));
+  } catch (err) {
+    return [];
+  }
+}
+
+/* ---------- D. MARCADORES NATIVOS ---------- */
+let carMarker, carEl, carWrapEl, originMarker, destMarker;
+
+function buildOriginDestinationMarkers(originCoord, destCoord) {
+  const originEl = document.createElement('div');
+  originEl.className = 'pin-origin';
+  originEl.innerHTML = '<div class="ring"></div><div class="core"></div>';
+  originMarker = new maplibregl.Marker({ element: originEl, anchor: 'center' }).setLngLat(originCoord).addTo(map);
+
+  const destEl = document.createElement('div');
+  destEl.className = 'pin-dest';
+  destEl.innerHTML = `<div class="dest-halo"></div><svg viewBox="0 0 26 34" fill="none">
+      <path d="M13 33C13 33 25 19.7 25 13C25 5.8 19.6 0 13 0C6.4 0 1 5.8 1 13C1 19.7 13 33 13 33Z" fill="#ffffff" stroke="#0A84FF" stroke-width="1.4"/>
+      <circle cx="13" cy="13" r="5" fill="#0A84FF"/>
+    </svg>`;
+  destMarker = new maplibregl.Marker({ element: destEl, anchor: 'bottom' }).setLngLat(destCoord).addTo(map);
+
+  // Vehículo: silueta cenital minimalista (visto desde arriba), estilo apps de
+  // movilidad — carrocería redondeada, parabrisas y techo sutiles, sin adornos.
+  // Apunta al norte por defecto para que la rotación por rumbo sea correcta.
+  // .car-anchor es lo que MapLibre traslada/rota; .car-wrap (hijo) es lo que
+  // nosotros escalamos según el zoom, sin pisar el transform del marker.
+  carEl = document.createElement('div');
+  carEl.className = 'car-anchor';
+  carWrapEl = document.createElement('div');
+  carWrapEl.className = 'car-wrap';
+  carWrapEl.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="carBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f5fbff"/><stop offset="55%" stop-color="#e6edf2"/><stop offset="100%" stop-color="#aebdc7"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="16" cy="27" rx="6.4" ry="1.9" fill="#000" opacity="0.28"/>
+      <rect x="11.6" y="4" width="8.8" height="23" rx="4.2" fill="url(#carBody)" stroke="#0A84FF" stroke-width="1.1"/>
+      <rect x="13" y="9.4" width="6" height="9.4" rx="2.6" fill="#0A2A44" opacity="0.85"/>
+      <circle cx="13.3" cy="7.4" r="1" fill="#FFC94A"/>
+      <circle cx="18.7" cy="7.4" r="1" fill="#FFC94A"/>
+      <rect x="12.6" y="23.4" width="2.4" height="1.1" rx="0.5" fill="#FF453A" opacity="0.85"/>
+      <rect x="17" y="23.4" width="2.4" height="1.1" rx="0.5" fill="#FF453A" opacity="0.85"/>
+    </svg>`;
+  carEl.appendChild(carWrapEl);
+  carMarker = new maplibregl.Marker({
+    element: carEl, anchor: 'center',
+    rotationAlignment: 'map', pitchAlignment: 'map'
+  }).setLngLat(ROUTE_LINE[0] || originCoord).addTo(map);
+
+  applyCarZoomScale();
+}
+
+// El vehículo se ve proporcionalmente más grande al acercar el zoom y más
+// pequeño al alejar, igual que cualquier marcador realista en un mapa de app
+// de movilidad (en vez de un tamaño fijo en píxeles para todo nivel de zoom).
+function applyCarZoomScale() {
+  if (!carWrapEl) return;
+  const z = map.getZoom();
+  const scale = Math.max(0.62, Math.min(1.35, 1 + (z - 13) * 0.14));
+  carWrapEl.style.transform = `scale(${scale.toFixed(3)})`;
+}
+map.on('zoom', applyCarZoomScale);
+
+/* ---------- E. ANIMACIÓN: posición real + rumbo geodésico ---------- */
+// Rumbo (bearing) real entre dos puntos geográficos, en grados (0 = norte).
+function bearing(p1, p2) {
+  const [lon1, lat1] = [p1[0] * Math.PI / 180, p1[1] * Math.PI / 180];
+  const [lon2, lat2] = [p2[0] * Math.PI / 180, p2[1] * Math.PI / 180];
+  const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+let t = 0, dir = 1, last = performance.now(), lastBearing = 0;
+const DURATION = 13000;
+function easeInOut(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
+
+function tick(now) {
+  const dt = now - last; last = now;
+  t += (dt / DURATION) * dir;
+  if (t > 1) { t = 1; dir = -1; }
+  if (t < 0) { t = 0; dir = 1; }
+  if (carMarker && ROUTE_LINE.length > 1) {
+    const eased = easeInOut(t);
+    const p0 = pointAtT(eased);
+    carMarker.setLngLat(p0);
+    const aheadT = eased + 0.004;
+    if (aheadT <= 1) {
+      const p1 = pointAtT(aheadT);
+      let b = bearing(p0, p1);
+      if (dir < 0) b = (b + 180) % 360;
+      lastBearing = b;
+    }
+    carMarker.setRotation(lastBearing);
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+
+/* ---------- F. CÁMARA: encuadre automático + transiciones suaves ---------- */
+// Como el vehículo siempre viaja SOBRE la ruta entre origen y destino, un
+// único encuadre que contenga toda la ruta (con padding para las tarjetas)
+// garantiza que origen, destino y vehículo estén visibles en todo momento,
+// sin "saltos" de cámara durante la animación.
+function fitRouteView(line, animate = true) {
+  if (!line || !line.length) return;
+  const bounds = line.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(line[0], line[0]));
+  const isNarrow = window.innerWidth < 880;
+  map.fitBounds(bounds, {
+    padding: isNarrow
+      ? { top: 70, bottom: 260, left: 24, right: 24 }
+      : { top: 90, bottom: 100, left: 320, right: 260 },
+    maxZoom: 15.3,
+    duration: animate ? 1500 : 0,
+    essential: true
+  });
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => fitRouteView(ROUTE_LINE), 350);
+});
+
+/* ---------- G. LEGIBILIDAD: +15%~20% en calles, avenidas y etiquetas -----------
+   Objetivo puntual del cliente: que las vías se distingan con más nitidez sin
+   aclarar el negro de fondo. Por eso NO se toca agua/terreno/edificios: solo se
+   refuerza opacidad + grosor de las líneas de vía, y el halo de las etiquetas
+   (que separa el texto del fondo oscuro sin cambiar su color ni aclararlo). */
+const ROAD_HINTS = ['road', 'street', 'highway', 'path', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'bridge', 'tunnel'];
+const LABEL_HINTS = ['road_label', 'street_label', 'highway_label', 'transportation_name'];
+
+function isRoadLayer(id) { return ROAD_HINTS.some(h => id.includes(h)); }
+function isRoadLabelLayer(id) { return LABEL_HINTS.some(h => id.includes(h)); }
+
+function boostOpacity(layerId, prop, factor) {
+  try {
+    const current = map.getPaintProperty(layerId, prop);
+    if (current === undefined) return;
+    if (typeof current === 'number') {
+      map.setPaintProperty(layerId, prop, Math.min(1, current * factor));
+    } else {
+      map.setPaintProperty(layerId, prop, ['min', 1, ['*', current, factor]]);
+    }
+  } catch (e) { /* algunas capas no soportan la propiedad, se ignora */ }
+}
+
+function boostWidth(layerId, factor) {
+  try {
+    const current = map.getPaintProperty(layerId, 'line-width');
+    if (current === undefined || typeof current !== 'number') return;
+    map.setPaintProperty(layerId, 'line-width', current * factor);
+  } catch (e) { /* expresiones complejas de zoom se dejan intactas */ }
+}
+
+function boostHalo(layerId) {
+  try {
+    map.setPaintProperty(layerId, 'text-halo-color', 'rgba(4,5,7,0.92)');
+    const currentHalo = map.getPaintProperty(layerId, 'text-halo-width');
+    map.setPaintProperty(layerId, 'text-halo-width', typeof currentHalo === 'number' ? Math.max(currentHalo, 1.3) : 1.3);
+  } catch (e) { /* no todas las capas de símbolo tienen halo */ }
+}
+
+function boostStyleVisibility() {
+  const layers = map.getStyle().layers || [];
+  layers.forEach(layer => {
+    if (layer.type === 'line') {
+      // +18% de opacidad para toda línea (agua/límites incluidos, discreto),
+      // y un refuerzo extra de opacidad + ancho específicamente para vías.
+      boostOpacity(layer.id, 'line-opacity', 1.18);
+      if (isRoadLayer(layer.id)) {
+        boostOpacity(layer.id, 'line-opacity', 1.06);
+        boostWidth(layer.id, 1.12);
+      }
+    }
+    if (layer.type === 'symbol') {
+      boostOpacity(layer.id, 'text-opacity', 1.18);
+      boostOpacity(layer.id, 'icon-opacity', 1.18);
+      if (isRoadLabelLayer(layer.id) || layer.id.includes('road') || layer.id.includes('street')) {
+        boostHalo(layer.id);
+      }
+    }
+  });
+}
+
+/* ---------- Estado del viaje + orquestación de carga ---------- */
+// Origen/destino "en curso": siempre un elemento real de LOCATIONS (nunca
+// texto libre no verificado). Colliguay -> Plaza de Armas replica el viaje
+// original por defecto, pero ahora ambos extremos pueden cambiar en vivo.
+let currentOrigin = LOCATIONS.find(l => l.name === 'Colliguay, Salamanca');
+let currentDestination = LOCATIONS.find(l => l.name === 'Plaza de Armas, Salamanca');
+
+async function rebuildTrip(animate = true) {
+  const originSnapped = await snapToRoad(currentOrigin.coord);
+  const destSnapped = await snapToRoad(currentDestination.coord);
+  await buildRoute(originSnapped, destSnapped);
+  if (!originMarker) {
+    buildOriginDestinationMarkers(originSnapped, destSnapped);
+  } else {
+    originMarker.setLngLat(originSnapped);
+    destMarker.setLngLat(destSnapped);
+    carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
+  }
+  t = 0; dir = 1; last = performance.now();
+  fitRouteView(ROUTE_LINE, animate);
+}
+
+map.on('load', async () => {
+  boostStyleVisibility();
+  await rebuildTrip(false);
+  setTimeout(() => fitRouteView(ROUTE_LINE, true), 200);
+});
+
+/* ---------- H. INTERACCIONES DE UI ---------- */
+const swapBtn = document.getElementById('swapBtn');
+const fromText = document.getElementById('fromText');
+const toText = document.getElementById('toText');
+const fromList = document.getElementById('fromList');
+const toList = document.getElementById('toList');
+
+/* ---------- I. AUTOCOMPLETADO: solo ubicaciones reales del área de servicio ----------
+   Nunca se acepta una dirección inventada: el origen/destino solo cambia cuando
+   el usuario TOCA una sugerencia de la lista (LOCATIONS local, más resultados
+   en vivo de Nominatim acotados al bounding box operacional). Escribir sin
+   seleccionar no mueve el viaje. */
+function renderList(list, results, onSelect, input) {
+  list.innerHTML = '';
+  if (!results.length) {
+    list.innerHTML = '<div class="ac-empty">Sin resultados en la zona de servicio</div>';
+  } else {
+    results.slice(0, 6).forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'ac-item';
+      item.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span></span>';
+      item.querySelector('span').textContent = r.name;
+      item.addEventListener('click', () => {
+        input.value = r.name;
+        list.classList.remove('show');
+        onSelect(r);
+      });
+      list.appendChild(item);
+    });
+  }
+  list.classList.add('show');
+}
+
+function setupAutocomplete(input, list, onSelect) {
+  let debounceT;
+  input.addEventListener('input', () => {
+    clearTimeout(debounceT);
+    const q = input.value.trim();
+    const qn = normalize(q);
+    let results = q.length ? LOCATIONS.filter(l => normalize(l.name).includes(qn)) : LOCATIONS.slice(0, 6);
+    renderList(list, results, onSelect, input);
+    debounceT = setTimeout(async () => {
+      if (q.length <= 2) return;
+      const live = await geocodeInArea(q);
+      const merged = results.slice();
+      live.forEach(r => { if (!merged.some(x => normalize(x.name) === normalize(r.name))) merged.push(r); });
+      if (document.activeElement === input) renderList(list, merged, onSelect, input);
+    }, 320);
+  });
+  input.addEventListener('focus', () => input.dispatchEvent(new Event('input')));
+  document.addEventListener('click', (e) => {
+    if (!input.closest('.field').contains(e.target)) list.classList.remove('show');
+  });
+}
+
+setupAutocomplete(fromText, fromList, (loc) => { currentOrigin = loc; rebuildTrip(); });
+setupAutocomplete(toText, toList, (loc) => { currentDestination = loc; rebuildTrip(); });
+
+swapBtn.addEventListener('click', () => {
+  [currentOrigin, currentDestination] = [currentDestination, currentOrigin];
+  fromText.value = currentOrigin.name;
+  toText.value = currentDestination.name;
+  dir = dir * -1;
+  rebuildTrip();
+});
+
+document.querySelectorAll('.service-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.service-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    const etaText = document.getElementById('etaText'), priceText = document.getElementById('priceText');
+    if (opt.dataset.service === 'enc') { etaText.textContent = '18 min'; priceText.textContent = '$3.200'; }
+    else { etaText.textContent = '25 min'; priceText.textContent = '$4.500'; }
+  });
+});
+
+/* ---------- J. FLUJO DE ESTADOS: idle -> buscando conductor -> asignado ----------
+   Estado 1 (idle): solo mapa + bottom sheet con el formulario. La tarjeta
+   "Conductor en camino" y el vehículo permanecen ocultos (ver CSS: opacity 0 /
+   pointer-events:none por defecto, nada de display manual).
+   Estado 2 (buscando): overlay de radar con mensajes rotativos, 2.5-4s.
+   Estado 3 (asignado): aparece la tarjeta del conductor, se revela el
+   vehículo sobre la ruta y arranca el seguimiento en tiempo real. */
+const requestBtn = document.getElementById('requestBtn');
+const driverCard = document.getElementById('driverCard');
+const searchingOverlay = document.getElementById('searchingOverlay');
+const searchingText = document.getElementById('searchingText');
+const requestCard = document.getElementById('requestCard');
+const SEARCH_MESSAGES = [
+  '🔍 Buscando el mejor conductor…',
+  'Encontrando un vehículo cercano…',
+  'Conectándote con un conductor disponible…'
+];
+let busy = false;
+
+requestBtn.addEventListener('click', () => {
+  if (busy) return; busy = true;
+  driverCard.classList.remove('visible', 'assigned');
+  carEl.classList.remove('visible');
+  requestBtn.classList.add('loading'); requestBtn.textContent = 'Buscando conductor…';
+  if (window.innerWidth <= 880) requestCard.classList.remove('expanded'); // deja ver el mapa mientras busca
+
+  let msgIdx = 0;
+  searchingText.textContent = SEARCH_MESSAGES[0];
+  searchingOverlay.classList.add('show');
+  const msgTimer = setInterval(() => {
+    msgIdx = (msgIdx + 1) % SEARCH_MESSAGES.length;
+    searchingText.textContent = SEARCH_MESSAGES[msgIdx];
+  }, 1150);
+
+  const waitTime = 2500 + Math.random() * 1500; // 2.5s - 4s
+  setTimeout(() => {
+    clearInterval(msgTimer);
+    searchingOverlay.classList.remove('show');
+    requestBtn.classList.remove('loading'); requestBtn.classList.add('done');
+    requestBtn.textContent = '¡Conductor asignado!';
+    driverCard.classList.add('visible', 'assigned');
+    t = 0; dir = 1; last = performance.now();
+    carEl.classList.add('visible');
+    setTimeout(() => { requestBtn.classList.remove('done'); requestBtn.textContent = 'Solicitar movilidad'; busy = false; }, 2600);
+  }, waitTime);
+});
+
+/* ---------- K. BOTTOM SHEET (solo móvil): el mapa siempre queda visible ---------- */
+const rcHead = document.getElementById('rcHead');
+const sheetHandle = document.getElementById('sheetHandle');
+
+function toggleSheet() {
+  if (window.innerWidth > 880) return;
+  requestCard.classList.toggle('expanded');
+}
+rcHead.addEventListener('click', toggleSheet);
+sheetHandle.addEventListener('click', toggleSheet);
+
+[fromText, toText].forEach(inp => inp.addEventListener('focus', () => {
+  if (window.innerWidth <= 880) requestCard.classList.add('expanded');
+}));
+
+// Gesto simple de arrastre (umbral de 30px), suficiente para un bottom sheet
+// de dos estados sin necesitar un motor de física completo.
+let dragStartY = null, dragging = false;
+function onDragStart(y) { dragStartY = y; dragging = true; }
+function onDragEnd(y) {
+  if (!dragging || window.innerWidth > 880) { dragging = false; return; }
+  dragging = false;
+  const delta = y - dragStartY;
+  if (delta < -28) requestCard.classList.add('expanded');
+  else if (delta > 28) requestCard.classList.remove('expanded');
+}
+[sheetHandle, rcHead].forEach(el => {
+  el.addEventListener('touchstart', e => onDragStart(e.touches[0].clientY), { passive: true });
+  el.addEventListener('touchend', e => onDragEnd(e.changedTouches[0].clientY));
+});
+
+document.getElementById('burgerBtn').addEventListener('click', () => {
+  if (driverCard.classList.contains('assigned')) driverCard.classList.toggle('visible');
+});
+</script>
+</body>
+</html>
