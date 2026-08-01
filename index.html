@@ -1,0 +1,2091 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Choapa GO</title>
+
+<!-- ================================================================
+     MAPLIBRE GL JS — motor de mapas real (WGS84 / OpenStreetMap data)
+     Tiles: OpenFreeMap (vector, gratis, sin API key) — estilo "dark"
+     Rutas: OSRM demo (routing real sobre calles, con fallback local)
+     ================================================================ -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+
+<style>
+/* =====================================================================
+   1) DESIGN TOKENS — paleta premium verde esmeralda (identidad oficial Choapa GO)
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg-deep:#0A0E13;
+  --accent-1:#059669;
+  --accent-2:#10B981;
+  --accent-3:#6EE7B7;
+  --route-glow:rgba(16,185,129,0.16);
+  --text-primary:#F5F7F9;
+  --text-secondary:#98A4AE;
+  --text-tertiary:#5C6670;
+  --border-glass: rgba(255,255,255,0.08);
+  --border-glass-strong: rgba(255,255,255,0.15);
+  --glass-fill: rgba(15,19,25,0.46);
+  --glass-fill-strong: rgba(14,18,23,0.6);
+  --radius-lg:18px;
+  --radius-md:14px;
+}
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{ height:100%; overscroll-behavior:none; }
+body{
+  font-family:'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--bg-deep); color: var(--text-primary);
+  overflow:hidden; -webkit-font-smoothing:antialiased;
+}
+.mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
+.display{ font-family:'Manrope','Inter',sans-serif; }
+button{ font-family:inherit; }
+
+/* =====================================================================
+   2) MAP LAYER — dark elegante con mejor contraste (protagonista absoluto)
+   ===================================================================== */
+#map{ position:fixed; inset:0; z-index:0; background:#0A0D11; }
+
+.map-grade{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  backdrop-filter: saturate(1.02) contrast(0.98) brightness(1.34);
+  -webkit-backdrop-filter: saturate(1.02) contrast(0.98) brightness(1.34);
+}
+.map-vignette{
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:
+    radial-gradient(ellipse 68% 62% at 46% 42%, rgba(6,8,11,0) 0%, rgba(6,8,11,0.12) 100%),
+    linear-gradient(180deg, rgba(6,8,11,0.22) 0%, rgba(6,8,11,0.0) 20%, rgba(6,8,11,0.0) 72%, rgba(6,8,11,0.32) 100%);
+}
+.map-grain{
+  position:fixed; inset:0; z-index:2; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.maplibregl-ctrl-group{
+  background: var(--glass-fill) !important;
+  border:1px solid var(--border-glass) !important;
+  backdrop-filter: blur(18px) saturate(160%);
+  box-shadow:0 6px 20px rgba(0,0,0,0.3) !important;
+  border-radius:11px !important; overflow:hidden;
+}
+.maplibregl-ctrl-group button{ background:transparent !important; width:30px !important; height:30px !important; }
+.maplibregl-ctrl-group button + button{ border-top:1px solid var(--border-glass) !important; }
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{ filter: invert(1) brightness(1.6) opacity(0.85); }
+.maplibregl-ctrl-attrib{
+  background: rgba(10,13,17,0.5) !important; color:var(--text-tertiary) !important;
+  font-size:9px !important; backdrop-filter: blur(10px);
+}
+.maplibregl-ctrl-attrib a{ color:var(--text-tertiary) !important; }
+.maplibregl-ctrl-scale{
+  background: var(--glass-fill) !important; border-color: var(--border-glass-strong) !important;
+  color: var(--text-secondary) !important; font-family:'JetBrains Mono',monospace !important; font-size:9.5px !important;
+  backdrop-filter: blur(14px);
+}
+
+/* =====================================================================
+   3) CUSTOM MAP MARKERS
+   ===================================================================== */
+.pin-origin{ width:16px; height:16px; position:relative; }
+.pin-origin .core{ width:100%; height:100%; border-radius:50%; background:#0B0F14; border:2px solid var(--accent-2); box-shadow:0 0 8px rgba(16,185,129,0.55); }
+.pin-origin .core::after{ content:''; position:absolute; inset:4px; border-radius:50%; background:var(--accent-2); }
+.pin-origin .ring{ position:absolute; inset:-10px; border-radius:50%; border:1.5px solid var(--accent-2); opacity:0; animation: pinPulse 2.8s ease-out infinite; }
+@keyframes pinPulse{ 0%{ transform:scale(.4); opacity:.4; } 100%{ transform:scale(2.1); opacity:0; } }
+
+/* .pin-dest es la raíz del marker (posicionada solo por MapLibre vía LngLat,
+   anchor:'bottom'); el ajuste visual va en .pin-dest-inner, un hijo, nunca
+   en la raíz — mismo motivo que en .poi-marker más arriba. */
+.pin-dest{ width:19px; height:25px; position:relative; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45)); }
+.pin-dest-inner{ position:relative; width:100%; height:100%; }
+.pin-dest svg{ width:100%; height:100%; position:relative; z-index:2; }
+.pin-dest .dest-halo{ position:absolute; left:50%; bottom:1px; width:22px; height:22px; margin-left:-11px; border-radius:50%; background:radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0) 70%); z-index:1; animation: destPulse 3.2s ease-out infinite; }
+@keyframes destPulse{ 0%{ transform:scale(.55); opacity:.6;} 70%{ opacity:.1;} 100%{ transform:scale(1.7); opacity:0;} }
+
+/* vehículo: silueta cenital (top-down), rotación por rumbo real.
+   .car-anchor es lo que MapLibre traslada/rota; .car-wrap (hijo) se escala
+   por zoom y flota, sin pisar el transform del marker. */
+.car-anchor{ width:1px; height:1px; opacity:0; transition: opacity .5s ease; }
+.car-anchor.visible{ opacity:1; }
+.car-wrap{ width:26px; height:26px; position:relative; left:-13px; top:-13px; transform-origin:50% 50%; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); animation: carFloat 2.6s ease-in-out infinite; }
+.car-wrap svg{ width:100%; height:100%; display:block; position:relative; z-index:2; }
+.car-wrap::before{ content:''; position:absolute; left:50%; top:50%; width:38px; height:38px; margin:-19px 0 0 -19px; border-radius:50%; background:radial-gradient(circle, rgba(110,231,183,0.28) 0%, rgba(16,185,129,0.12) 55%, rgba(16,185,129,0) 72%); z-index:1; animation: carHalo 2.6s ease-in-out infinite; pointer-events:none; }
+@keyframes carFloat{ 0%,100%{ margin-top:0; } 50%{ margin-top:-1px; } }
+@keyframes carHalo{ 0%,100%{ opacity:.6; transform:scale(1);} 50%{ opacity:.9; transform:scale(1.06);} }
+
+/* --- Puntos de interés (POI) reales de Salamanca ---
+   Los POI ya NO son elementos HTML posicionados con CSS/transform: se
+   renderizan como una fuente GeoJSON + capas `symbol` nativas de MapLibre
+   (ver sección POI en el JS), el mismo mecanismo que usan Google Maps y
+   Mapbox para sus propios iconos. El motor del mapa decide en cada frame
+   dónde dibujarlos según cámara/zoom/pitch/rotación, y resuelve él mismo
+   la anti-colisión entre íconos cercanos (icon-allow-overlap:false).
+   Aquí solo queda el estilo del popup nativo que aparece al tocar un POI. */
+.poi-popup .maplibregl-popup-content{
+  background:rgba(10,13,17,0.94); border:1px solid var(--border-glass-strong); color:var(--text-primary);
+  font-family:'Inter',sans-serif; font-size:11px; font-weight:600; padding:7px 11px; border-radius:9px;
+  box-shadow:0 10px 24px rgba(0,0,0,0.4); backdrop-filter: blur(16px) saturate(160%);
+  letter-spacing:.005em;
+}
+.poi-popup .maplibregl-popup-tip{ display:none; }
+.poi-popup{ z-index:8; }
+
+/* =====================================================================
+   4) UI OVERLAY
+   ===================================================================== */
+.ui-layer{ position:relative; z-index:10; height:100vh; pointer-events:none; }
+.ui-layer > *{ pointer-events:auto; }
+
+.chrome-left,.chrome-center,.chrome-right{
+  position:fixed; top:14px; z-index:20; display:flex; align-items:center;
+  background: var(--glass-fill); border:1px solid var(--border-glass);
+  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05);
+  animation: chromeEnter .7s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes chromeEnter{ from{ opacity:0; transform:translateY(-10px);} to{ opacity:1; transform:translateY(0);} }
+.chrome-left{ left:16px; padding:6px 12px 6px 6px; gap:8px; }
+.brand-mark{ width:26px; height:26px; border-radius:8px; background: radial-gradient(circle at 32% 30%, var(--accent-3), var(--accent-1) 72%); display:flex; align-items:center; justify-content:center; box-shadow:0 0 8px rgba(5,150,105,0.4); flex-shrink:0; }
+.brand-mark svg{ width:13px; height:13px; }
+.brand-word{ font-family:'Manrope',sans-serif; font-weight:700; font-size:13.5px; letter-spacing:-0.01em; }
+.brand-word span{ color:var(--accent-2); }
+.chrome-center{ left:50%; transform:translateX(-50%); padding:5px; gap:2px; }
+.chrome-center a{ color:var(--text-secondary); text-decoration:none; font-size:12px; font-weight:500; padding:7px 13px; border-radius:999px; transition:all .2s ease; }
+.chrome-center a:hover,.chrome-center a.active{ color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.chrome-right{ right:16px; padding:5px; gap:4px; }
+.icon-btn{ width:30px; height:30px; border-radius:50%; border:none; background:transparent; display:flex; align-items:center; justify-content:center; color:var(--text-secondary); cursor:pointer; transition:all .2s ease; }
+.icon-btn:hover{ color:var(--text-primary); background:rgba(255,255,255,0.06); }
+.icon-btn svg{ width:14px; height:14px; }
+.help-pill{ display:flex; align-items:center; gap:6px; padding:7px 13px; border-radius:999px; background:rgba(5,150,105,0.08); color:var(--accent-2); font-size:12px; font-weight:600; border:1px solid rgba(5,150,105,0.2); cursor:pointer; transition:all .2s ease; }
+.help-pill:hover{ background:rgba(5,150,105,0.15); }
+.help-pill svg{ width:12px; height:12px; }
+
+.panel{
+  background: linear-gradient(165deg, rgba(19,24,30,0.6), rgba(11,14,18,0.54) 55%, rgba(9,12,16,0.56));
+  border:1px solid var(--border-glass); border-radius:var(--radius-lg);
+  backdrop-filter: blur(28px) saturate(170%); -webkit-backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: 0 24px 60px rgba(0,0,0,0.45), 0 2px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.015);
+  position:relative;
+}
+.panel::before{ content:''; position:absolute; top:0; left:14px; right:14px; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.24),transparent); }
+.panel::after{ content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; background:radial-gradient(ellipse 70% 45% at 18% 0%, rgba(255,255,255,0.04), transparent 65%); }
+
+.request-card{
+  position:fixed; left:16px; top:64px; width:288px; z-index:15; padding:16px;
+  animation: cardEnterLeft .75s .1s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes cardEnterLeft{ from{ opacity:0; transform:translateX(-14px) scale(.98);} to{ opacity:1; transform:translateX(0) scale(1);} }
+.rc-body{ display:contents; }
+.rc-head h1{ font-family:'Manrope',sans-serif; font-size:13.5px; font-weight:600; letter-spacing:-0.005em; color:var(--text-secondary); }
+.rc-head .sub{ color:var(--text-tertiary); font-size:10px; margin-top:2px; letter-spacing:.01em; }
+.fields{ margin-top:14px; position:relative; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease; }
+.field{ display:flex; align-items:center; gap:10px; padding:11px 12px; background:rgba(255,255,255,0.025); border:1px solid var(--border-glass); transition: background .2s ease, border-color .2s ease; }
+.field:focus-within{ background:rgba(5,150,105,0.06); border-color:rgba(5,150,105,0.28); }
+.field:first-child{ border-radius:12px 12px 0 0; border-bottom:none; }
+.field:last-child{ border-radius:0 0 12px 12px; }
+.dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.dot.o{ background:var(--accent-2); box-shadow:0 0 6px rgba(16,185,129,0.7); }
+.dot.d{ background:#fff; border-radius:2px; }
+.field-text{ line-height:1.2; }
+.field-text .label{ font-size:8.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+.field-text .value{ font-size:12.5px; font-weight:600; margin-top:1px; }
+.swap-btn{ position:absolute; right:9px; top:50%; transform:translateY(-50%); width:26px; height:26px; border-radius:50%; background:#12171d; border:1px solid var(--border-glass-strong); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text-secondary); transition:all .25s ease; z-index:4; }
+.swap-btn:hover{ color:var(--accent-2); border-color:rgba(5,150,105,.4); transform:translateY(-50%) rotate(180deg); }
+.swap-btn svg{ width:12px; height:12px; }
+.service-row{ margin-top:13px; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease; }
+.service-row .row-label{ font-size:9px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.07em; margin-bottom:7px; font-weight:600; }
+.service-toggle{ display:flex; gap:6px; }
+.service-opt{ flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:9px 6px; border-radius:10px; border:1px solid var(--border-glass); background:rgba(255,255,255,0.015); cursor:pointer; transition:all .2s ease; font-size:11px; font-weight:600; color:var(--text-secondary); }
+.service-opt svg{ width:15px; height:15px; opacity:.65; }
+.service-opt.active{ border-color:rgba(5,150,105,.35); background:linear-gradient(180deg, rgba(5,150,105,0.12), rgba(5,150,105,0.02)); color:var(--text-primary); box-shadow: inset 0 0 0 1px rgba(5,150,105,0.18); }
+.service-opt.active svg{ opacity:1; filter:drop-shadow(0 0 3px rgba(16,185,129,0.5)); }
+
+/* --- tarjetas independientes de tiempo / precio (glassmorphism sutil) --- */
+.estimate-grid{ margin-top:13px; display:flex; gap:8px; }
+.estimate-card{
+  flex:1; padding:10px 12px; border-radius:var(--radius-md);
+  background: linear-gradient(160deg, rgba(255,255,255,0.045), rgba(255,255,255,0.01));
+  border:1px solid var(--border-glass);
+  backdrop-filter: blur(16px) saturate(150%); -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+  transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease, padding .4s ease;
+}
+.estimate-card .elabel{ font-size:8.5px; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:.07em; font-weight:600; }
+.estimate-card .evalue{ font-size:15px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+.estimate-card.price{ border-color:rgba(5,150,105,0.16); }
+.estimate-card.price .evalue{ color:var(--accent-2); text-shadow:0 0 10px rgba(16,185,129,0.22); }
+
+.request-btn{
+  margin-top:13px; width:100%; padding:13px; border-radius:12px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(150deg, #1B222A, #0F1418 75%);
+  color:#F5F7F9; font-weight:600; font-size:13px; letter-spacing:.01em;
+  transition: transform .15s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
+  box-shadow:0 6px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+.request-btn:hover{ border-color:rgba(16,185,129,0.32); box-shadow:0 8px 20px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
+.request-btn:active{ transform:scale(.985); box-shadow:0 3px 10px rgba(0,0,0,0.28); }
+.request-btn.loading{ background:linear-gradient(150deg,#14181C,#0C0F12); color:var(--text-secondary); cursor:default; border-color:rgba(255,255,255,0.08); box-shadow:none; }
+.request-btn.loading::before{
+  content:''; width:14px; height:14px; margin-right:8px; vertical-align:-2px; display:inline-block;
+  border-radius:50%; border:2px solid rgba(255,255,255,0.18); border-top-color:var(--accent-2);
+  animation: btnSpin .7s linear infinite; will-change: transform;
+}
+@keyframes btnSpin{ to{ transform: rotate(360deg); } }
+.request-btn.done{ background:linear-gradient(150deg,#123B34,#0D2A26); color:#CFF7F1; border-color:rgba(16,185,129,0.3); box-shadow:0 6px 16px rgba(0,0,0,0.3); }
+.footnote{ margin-top:8px; font-size:9.5px; color:var(--text-tertiary); text-align:center; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease; }
+.sheet-handle{ display:none; }
+.rc-mini-route{ display:none; }
+.rc-peek{ display:none; }
+
+/* campos como inputs reales + autocompletado restringido a ubicaciones válidas del área */
+.field{ position:relative; }
+.field-text{ flex:1; min-width:0; }
+.field-text input{ width:100%; background:transparent; border:none; outline:none; color:var(--text-primary); font-size:12.5px; font-weight:600; font-family:inherit; padding:0; }
+.field-text input::placeholder{ color:var(--text-tertiary); font-weight:500; }
+.field.locked input{ color:var(--text-primary); }
+.field.invalid input{ color:#ff8a80; }
+/* FIX arquitectura (causa raíz del bug móvil): esta lista se relocaliza por
+   JS como hijo directo de <body> (ver relocateAutocompleteToBody()), NO
+   como descendiente de .request-card. Motivo: .request-card usa `transform`
+   permanentemente para animar el sheet, y por spec de CSS un ancestro con
+   `transform` pasa a ser el "containing block" incluso de descendientes
+   `position:fixed` — y si además ese ancestro tiene `overflow:auto` (como
+   ocurre en el estado expandido), cualquier descendiente `position:absolute`
+   que se salga de su caja queda recortado. Ambos efectos combinados hacían
+   que la lista "se renderizara pero quedara fuera de pantalla o detrás de
+   otro elemento". Al vivir en <body> (que no está transformado), el
+   `position:fixed` es real y relativo al viewport; su posición y tamaño se
+   calculan en JS (positionAutocompleteList) a partir del rect real del
+   input, así que nunca queda huérfana ni clippeada. */
+.autocomplete-list{ position:fixed; z-index:70; max-height:220px; overflow-y:auto; background: rgba(13,17,22,0.94); border:1px solid var(--border-glass-strong); border-radius:12px; backdrop-filter: blur(20px) saturate(160%); box-shadow:0 16px 36px rgba(0,0,0,0.5); display:none; }
+.autocomplete-list.show{ display:block; }
+.ac-item{ padding:9px 12px; font-size:12px; color:var(--text-secondary); cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid rgba(255,255,255,0.04); }
+.ac-item:last-child{ border-bottom:none; }
+.ac-item:hover, .ac-item.hl{ background:rgba(5,150,105,0.1); color:var(--text-primary); }
+.ac-item svg{ width:12px; height:12px; flex-shrink:0; opacity:.7; }
+.ac-empty{ padding:10px 12px; font-size:11px; color:var(--text-tertiary); text-align:center; }
+
+/* pantalla de búsqueda de conductor (estado 2) */
+.searching-overlay{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(6,8,11,0.38); backdrop-filter: blur(6px); opacity:0; pointer-events:none; transition: opacity .35s ease; }
+.searching-overlay.show{ opacity:1; pointer-events:auto; }
+.searching-card{ width:250px; padding:26px 22px; text-align:center; border-radius:20px; transform: scale(.94); transition: transform .4s cubic-bezier(.16,1,.3,1); }
+.searching-overlay.show .searching-card{ transform: scale(1); }
+.radar{ position:relative; width:60px; height:60px; margin:0 auto 16px; }
+.radar-ring{ position:absolute; inset:0; border-radius:50%; border:1.5px solid var(--accent-2); opacity:0; animation: radarPulse 1.9s ease-out infinite; }
+.radar-ring:nth-child(2){ animation-delay:.63s; }
+.radar-ring:nth-child(3){ animation-delay:1.26s; }
+@keyframes radarPulse{ 0%{ transform:scale(.3); opacity:.65;} 100%{ transform:scale(1.6); opacity:0;} }
+.radar-core{ position:absolute; inset:20px; border-radius:50%; background: radial-gradient(circle at 35% 30%, var(--accent-3), var(--accent-1) 75%); box-shadow:0 0 14px rgba(5,150,105,0.5); }
+.searching-text{ font-size:13px; font-weight:600; color:var(--text-primary); min-height:18px; }
+.searching-sub{ font-size:10.5px; color:var(--text-tertiary); margin-top:5px; }
+
+.driver-card{ position:fixed; right:16px; top:64px; width:226px; z-index:15; padding:13px 14px; transition: box-shadow .4s ease, border-color .4s ease, opacity .4s ease, transform .4s ease; opacity:0; transform:translateX(14px) scale(.98); pointer-events:none; }
+.driver-card.visible{ opacity:1; transform:translateX(0) scale(1); pointer-events:auto; animation: cardEnterRight .6s cubic-bezier(.16,1,.3,1) both; }
+@keyframes cardEnterRight{ from{ opacity:0; transform:translateX(14px) scale(.98);} to{ opacity:1; transform:translateX(0) scale(1);} }
+.driver-card.assigned{ border-color: rgba(16,185,129,0.3); box-shadow: 0 18px 44px rgba(0,0,0,0.45), 0 0 16px rgba(16,185,129,0.12); }
+.driver-card .status{ display:flex; align-items:center; gap:6px; font-size:10.5px; font-weight:600; color:var(--accent-2); margin-bottom:11px; }
+.status-dot{ width:5px; height:5px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 6px rgba(16,185,129,0.7); animation: dotblink 1.8s ease-in-out infinite; }
+@keyframes dotblink{ 0%,100%{ opacity:1;} 50%{ opacity:.3;} }
+.driver-info{ display:flex; align-items:center; gap:10px; }
+.avatar{ width:38px; height:38px; border-radius:50%; flex-shrink:0; background:linear-gradient(140deg,#212932,#10151a); border:1.5px solid rgba(5,150,105,0.35); box-shadow:0 0 0 3px rgba(5,150,105,0.06), 0 4px 10px rgba(0,0,0,0.35); display:flex; align-items:center; justify-content:center; font-family:'Manrope',sans-serif; font-weight:700; font-size:12.5px; color:var(--accent-2); }
+.driver-name{ font-weight:700; font-size:13px; display:flex; align-items:center; gap:5px; }
+.rating{ display:flex; align-items:center; gap:2px; font-size:10.5px; color:var(--text-secondary); margin-top:1px; }
+.rating svg{ width:10px; height:10px; fill:var(--accent-2); }
+.vehicle-line{ font-size:10.5px; color:var(--text-secondary); margin-top:2px; }
+.plate{ display:inline-block; margin-left:4px; padding:1px 5px; border-radius:4px; background:rgba(255,255,255,0.05); border:1px solid var(--border-glass); font-size:9px; font-weight:600; }
+.eta-row{ margin-top:11px; display:flex; align-items:center; justify-content:space-between; padding-top:11px; border-top:1px solid var(--border-glass); }
+.eta-label{ font-size:10.5px; color:var(--text-secondary); }
+.eta-value{ font-size:15px; font-weight:700; color:var(--accent-2); }
+.contact-row{ display:flex; gap:6px; margin-top:10px; }
+.contact-btn{ flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:7px; border-radius:9px; border:1px solid var(--border-glass); background:rgba(255,255,255,0.012); color:var(--text-secondary); font-size:10.5px; font-weight:600; cursor:pointer; transition:all .2s ease; }
+.contact-btn:hover{ color:var(--text-primary); border-color:rgba(5,150,105,.3); }
+.contact-btn svg{ width:11px; height:11px; }
+
+.status-strip{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:15; display:flex; background:var(--glass-fill); border:1px solid var(--border-glass); border-radius:14px; backdrop-filter: blur(22px) saturate(160%); box-shadow:0 10px 28px rgba(0,0,0,0.35); animation: chromeEnter .8s .3s cubic-bezier(.16,1,.3,1) both; overflow:hidden; }
+.strip-item{ display:flex; align-items:center; gap:8px; padding:9px 15px; }
+.strip-div{ width:1px; background:var(--border-glass); }
+.strip-icon{ width:20px; height:20px; border-radius:6px; background:rgba(5,150,105,0.08); border:1px solid rgba(5,150,105,0.18); display:flex; align-items:center; justify-content:center; color:var(--accent-2); flex-shrink:0; }
+.strip-icon svg{ width:11px; height:11px; }
+.strip-text .stitle{ font-size:11px; font-weight:600; line-height:1.15; }
+.strip-text .sdesc{ font-size:9px; color:var(--text-tertiary); line-height:1.15; margin-top:1px; }
+
+.toast{ position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:30; padding:9px 16px; border-radius:10px; background:rgba(20,10,10,0.65); border:1px solid rgba(255,90,80,0.28); color:#ffb3ab; font-size:11.5px; opacity:0; pointer-events:none; transition:all .35s ease; backdrop-filter: blur(14px); max-width:88vw; text-align:center; }
+.toast.show{ opacity:1; transform:translate(-50%,0); }
+
+/* ===== BOTTOM SHEET NATIVO DE 3 ESTADOS (solo móvil): el mapa manda como
+   elemento principal. "Colapsado" deja ver casi todo el mapa (solo una
+   franja mínima con ruta + precio + CTA rápido). "Medio" es el estado por
+   defecto: resumen de ruta, tarjetas de tiempo/precio y el botón. "Expandido"
+   revela además los campos de origen/destino y el selector de servicio. ===== */
+/* ===== BOTTOM SHEET NATIVO ESTILO UBER (solo móvil) — TODO EL MOVIMIENTO
+   ES `transform`, NUNCA height/top/margin. La lámina tiene una altura fija
+   de --sheet-h (50dvh, el estado "expandido"); para "colapsar" simplemente
+   se traslada hacia abajo lo justo para dejar asomando --sheet-peek
+   (22-25dvh). Así el navegador nunca recalcula layout durante la
+   animación: solo compone una capa ya rasterizada — la misma técnica que
+   usan las hojas nativas de iOS/Android y el propio Uber. ===== */
+:root{
+  /* FIX arquitectura móvil: el estado "expandido" pasa de 50dvh a 82dvh.
+     Con 50dvh, los campos de Origen/Destino (reordenados más abajo) quedaban
+     por debajo del pliegue del panel, compitiendo además con el teclado
+     virtual — esa era la causa raíz de "no deja elegir origen/destino". */
+  --sheet-h: 82dvh;
+  --sheet-peek: 24dvh;
+  --sheet-spring: cubic-bezier(.32,.94,.24,1.02);
+}
+@media (max-width: 880px){
+  .chrome-center{ display:none; }
+
+  .sheet-scrim{
+    position:fixed; inset:0; z-index:12; pointer-events:none;
+    background:#04060b; opacity:0;
+    transition: opacity .28s cubic-bezier(.22,1,.36,1);
+    will-change: opacity;
+  }
+  .sheet-scrim.dragging{ transition:none; }
+
+  .request-card{
+    left:0; right:0; top:auto; bottom:0; width:auto;
+    display:flex; flex-direction:column;
+    border-radius:22px 22px 0 0;
+    padding:8px 20px calc(12px + env(safe-area-inset-bottom));
+    height:var(--sheet-h);
+    overflow:hidden;
+    box-shadow: 0 -14px 34px rgba(0,0,0,0.4), 0 -1px 0 rgba(255,255,255,0.03) inset;
+    /* La animación de entrada de escritorio (cardEnterLeft) fija su propio
+       transform al terminar (fill-mode both) y esto GANA por encima del
+       transform que pone el JS del bottom sheet — por eso en móvil el
+       panel quedaba "trabado" sin poder colapsar ni expandir. Se anula
+       aquí explícitamente. */
+    animation: none;
+    transform: translateY(calc(var(--sheet-h) - var(--sheet-peek)));
+    bottom: var(--kb-inset, 0px);
+    transition: transform .28s var(--sheet-spring), box-shadow .28s ease, border-color .28s ease, background .28s ease, bottom .22s ease;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    will-change: transform;
+    z-index:16;
+    justify-content:flex-start;
+  }
+  /* Estado colapsado/expandido lo maneja JS con transform inline (para
+     poder arrancar la animación exactamente desde donde el dedo la dejó);
+     estas reglas por atributo solo quedan como respaldo para el primer
+     paint antes de que el script corra. */
+  .request-card[data-sheet="expanded"]{ transform: translateY(0); }
+  .request-card.dragging{ transition:none; }
+  .request-card[data-sheet="expanded"]{
+    background: linear-gradient(165deg, rgba(24,30,37,0.74), rgba(13,17,22,0.68) 55%, rgba(10,14,18,0.7));
+    border-color: rgba(16,185,129,0.28);
+    box-shadow: 0 -22px 50px rgba(0,0,0,0.55), 0 0 0 1px rgba(16,185,129,0.08), 0 -1px 0 rgba(255,255,255,0.05) inset;
+    backdrop-filter: blur(34px) saturate(180%);
+    -webkit-backdrop-filter: blur(34px) saturate(180%);
+  }
+  .request-card::before{ left:44%; right:44%; }
+
+  .sheet-handle{
+    display:block; flex-shrink:0; width:38px; height:4.5px; border-radius:3px;
+    background:var(--border-glass-strong); margin:2px auto 8px;
+    transition: background .3s ease, transform .15s ease;
+    touch-action:none;
+  }
+  .request-card[data-sheet="expanded"] .sheet-handle{ background:rgba(16,185,129,0.55); }
+
+  /* --- cuerpo: siempre montado por completo (nada de display:none/max-height
+     en JS ni CSS) — lo único que decide qué se ve es el transform del
+     padre. `order` reubica visualmente head/estimate/botón por delante de
+     los campos SOLO en móvil, sin tocar el orden real del DOM (el layout
+     de escritorio usa ese mismo DOM con `display:contents`, intacto). --- */
+  .rc-body{ display:flex; flex-direction:column; flex:1; min-height:0; }
+  .rc-head{ order:1; flex-shrink:0; touch-action:none; }
+  .rc-head h1{ font-size:12.5px; }
+  .rc-head .sub{ display:none; }
+  .estimate-grid{ order:2; flex-shrink:0; }
+  .request-btn{ order:3; flex-shrink:0; touch-action: manipulation; }
+  #rcExpandExtra{ order:4; flex-shrink:0; margin-top:13px; }
+  .footnote{ order:5; }
+
+  /* FIX arquitectura móvil: mientras el sheet está expandido (modo
+     búsqueda), los campos Origen/Destino pasan a ser el PRIMER bloque de
+     contenido después de la cabecera — nunca deben quedar enterrados
+     debajo de las tarjetas de estimado y el botón. Esto es lo que permite
+     alcanzar y tocar los campos apenas se abre el panel, sin depender de
+     scroll dentro de un contenedor que además puede estar compartiendo
+     espacio con el teclado virtual. */
+  .request-card[data-sheet="expanded"] #rcExpandExtra{ order:2; margin-top:6px; }
+  .request-card[data-sheet="expanded"] .estimate-grid{ order:3; }
+  .request-card[data-sheet="expanded"] .request-btn{ order:4; }
+  .request-card[data-sheet="expanded"] .footnote{ order:5; }
+
+  .rc-mini-route{
+    display:flex; align-items:center; gap:6px; margin-top:6px; font-size:13px; font-weight:600;
+    color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    letter-spacing:.005em;
+  }
+  .request-card[data-sheet="expanded"] .rc-mini-route{ display:none; }
+
+  /* Cuando está colapsada, la extra queda fuera de pantalla por el propio
+     transform del padre; `inert` (vía JS) evita que quede enfocable con
+     teclado/lector de pantalla mientras no es visible. */
+  .request-card[data-sheet="expanded"]{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+  .swap-btn, .service-opt, .icon-btn, .help-pill, .contact-btn{ touch-action: manipulation; }
+
+  .driver-card{
+    left:10px; right:10px; top:60px; bottom:auto; width:auto; max-width:240px; margin:0 auto;
+    padding:11px 13px;
+  }
+  .driver-card.visible{ animation: cardEnterUp .6s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes cardEnterUp{ from{ opacity:0; transform:translateY(-10px) scale(.98);} to{ opacity:1; transform:translateY(0) scale(1);} }
+  .status-strip{ display:none; }
+  .searching-card{ width:80vw; max-width:280px; }
+}
+@media (max-width:420px){ .brand-word{ display:none; } }
+button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline-offset:2px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== MAP (MapLibre GL, real OSM data) ===================== -->
+<div id="map"></div>
+<div class="map-grade"></div>
+<div class="map-vignette"></div>
+<div class="map-grain"></div>
+<div class="sheet-scrim"></div>
+<div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
+
+<div class="searching-overlay" id="searchingOverlay">
+  <div class="panel searching-card">
+    <div class="radar"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core"></div></div>
+    <div class="searching-text" id="searchingText">Buscando el mejor conductor…</div>
+    <div class="searching-sub">Esto toma solo unos segundos</div>
+  </div>
+</div>
+
+<!-- ===================== FLOATING PRODUCT UI ===================== -->
+<div class="ui-layer">
+
+  <div class="chrome-left">
+    <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2C7.6 2 4 5.6 4 10c0 6 8 12 8 12s8-6 8-12c0-4.4-3.6-8-8-8z" fill="#fff"/><circle cx="12" cy="10" r="3" fill="#059669"/></svg></div>
+    <div class="brand-word display">Choapa<span>GO</span></div>
+  </div>
+
+  <div class="chrome-center">
+    <a href="#" class="active">Inicio</a>
+    <a href="#">Cómo funciona</a>
+    <a href="#">Servicios</a>
+    <a href="#">Sobre nosotros</a>
+  </div>
+
+  <div class="chrome-right">
+    <button class="icon-btn" id="burgerBtn" aria-label="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round"/></svg></button>
+    <div class="help-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 18h.01M9.5 9a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5" stroke-linecap="round"/><circle cx="12" cy="12" r="9.5"/></svg>Ayuda</div>
+  </div>
+
+  <div class="panel request-card" id="requestCard" data-sheet="collapsed">
+    <div class="sheet-handle" id="sheetHandle"></div>
+
+    <div class="rc-body" id="rcBody">
+      <div class="rc-head" id="rcHead">
+        <h1 class="display">Solicita tu movilidad</h1>
+        <div class="sub">Rápido, seguro y conectado a Salamanca</div>
+        <div class="rc-mini-route mono" id="rcMiniRoute">Colliguay → Plaza de Armas</div>
+      </div>
+      <div id="rcExpandExtra">
+        <div class="fields">
+          <div class="field" id="fromField"><div class="dot o"></div><div class="field-text"><div class="label">Desde</div><input id="fromText" class="mono-off" autocomplete="off" value="Colliguay, Salamanca" /></div>
+            <div class="autocomplete-list" id="fromList"></div>
+          </div>
+          <div class="field" id="toField"><div class="dot d"></div><div class="field-text"><div class="label">Hacia</div><input id="toText" autocomplete="off" value="Plaza de Armas, Salamanca" /></div>
+            <div class="autocomplete-list" id="toList"></div>
+          </div>
+          <button class="swap-btn" id="swapBtn" aria-label="Intercambiar origen y destino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5-5 5 5M7 14l5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+        <div class="service-row">
+          <div class="row-label">Tipo de servicio</div>
+          <div class="service-toggle">
+            <div class="service-opt active" data-service="mov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13l1.5-4.5A2 2 0 0 1 6.4 7h11.2a2 2 0 0 1 1.9 1.5L21 13v5a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z" stroke-linejoin="round"/><circle cx="7" cy="17" r="1.3"/><circle cx="17" cy="17" r="1.3"/></svg>Movilidad</div>
+            <div class="service-opt" data-service="enc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke-linejoin="round"/><path d="M3 8v8l9 5 9-5V8M12 13v8" stroke-linejoin="round"/></svg>Encargos</div>
+          </div>
+        </div>
+      </div>
+      <div class="estimate-grid">
+        <div class="estimate-card"><div class="elabel">Tiempo</div><div class="evalue mono" id="etaText">25 min</div></div>
+        <div class="estimate-card price"><div class="elabel">Precio</div><div class="evalue mono" id="priceText">$4.500</div></div>
+      </div>
+      <button class="request-btn" id="requestBtn">Solicitar movilidad</button>
+      <div class="footnote">Incluye recargo por zona rural</div>
+    </div>
+  </div>
+
+  <div class="panel driver-card" id="driverCard">
+    <div class="status"><span class="status-dot"></span>Conductor en camino</div>
+    <div class="driver-info">
+      <div class="avatar">JR</div>
+      <div>
+        <div class="driver-name">Jeison R.<span class="rating"><svg viewBox="0 0 20 20"><path d="M10 1.5l2.6 5.6 6.1.6-4.6 4.1 1.4 6-5.5-3.2-5.5 3.2 1.4-6-4.6-4.1 6.1-.6z"/></svg>4.9</span></div>
+        <div class="vehicle-line">Chevrolet Tracker <span class="plate mono">ABC123</span></div>
+      </div>
+    </div>
+    <div class="eta-row"><div class="eta-label">Llega en</div><div class="eta-value mono" id="driverEta">8 min</div></div>
+    <div class="contact-row">
+      <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6.3 6.3l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2z" stroke-linejoin="round"/></svg>Llamar</div>
+      <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg>Mensaje</div>
+    </div>
+  </div>
+
+  <div class="status-strip">
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 3v6c0 5-3.4 8.5-8 11-4.6-2.5-8-6-8-11V5z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Seguridad</div><div class="sdesc">Verificado</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3" stroke-linecap="round"/></svg></div><div class="strip-text"><div class="stitle">Puntualidad</div><div class="sdesc">Siempre</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Encargos</div><div class="sdesc">Compras y más</div></div></div>
+    <div class="strip-div"></div>
+    <div class="strip-item"><div class="strip-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.5 8.5 0 0 1-3.8-.9L3 20l1.1-5.3a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 11.6 2a8.5 8.5 0 0 1 9.4 8.4z" stroke-linejoin="round"/></svg></div><div class="strip-text"><div class="stitle">Soporte</div><div class="sdesc">24/7</div></div></div>
+  </div>
+
+</div>
+
+<script>
+/* =====================================================================
+   JAVASCRIPT — Choapa GO map engine v3 (rediseño visual, misma lógica)
+   Sections:
+     A. Geodata + zona operacional (bounds duros)
+     B. Inicialización del mapa
+     C. Ruta real (OSRM Directions API, con fallback local)
+     D. Marcadores nativos (origen / destino / vehículo)
+     E. Movimiento del vehículo: "GPS ping" cada 2.5-3s + interpolación suave
+     F. Cámara: encuadre automático y transiciones suaves
+     G. Legibilidad: calles y etiquetas más nítidas, menos oscuridad
+     H. Interacciones de UI (swap, servicio, solicitud)
+   ===================================================================== */
+
+/* ---------- A. GEODATA + ZONA OPERACIONAL ---------- */
+const GEO = {
+  salamanca:  [-70.9649, -31.7806],
+  colliguay:  [-71.0152, -31.8239],
+  elTambo:    [-71.0222, -31.7867],
+  chalinga:   [-70.9772, -31.7687]
+};
+
+const AREA_BOUNDS = [[-71.11, -31.86], [-70.93, -31.74]];
+
+const LOCATIONS = [
+  { name: 'Plaza de Armas, Salamanca',                    coord: GEO.salamanca },
+  { name: 'Municipalidad de Salamanca',                   coord: [-70.9659, -31.7810] },
+  { name: 'Parroquia Ntra. Sra. del Rosario, Salamanca',  coord: [-70.9654, -31.7814] },
+  { name: 'Terminal de Buses, Salamanca',                 coord: [-70.9631, -31.7790] },
+  { name: 'Hospital de Salamanca',                        coord: [-70.9711, -31.7743] },
+  { name: 'Azotea 400 (Ruiz Valledor), Salamanca',        coord: [-70.9674, -31.7801] },
+  { name: 'Dolce Coffee, Salamanca',                      coord: [-70.9639, -31.7798] },
+  { name: 'Entre Nos, Av. Infante, Salamanca',            coord: [-70.9646, -31.7772] },
+  { name: 'Unimarc, Manuel Bulnes, Salamanca',            coord: [-70.9612, -31.7825] },
+  { name: 'Super Bodega aCuenta, Salamanca',              coord: [-70.9621, -31.7820] },
+  { name: 'Supermercado Piolín, Salamanca',                coord: [-70.9633, -31.7822] },
+  { name: 'Copec O\'Higgins, Salamanca',                  coord: [-70.9637, -31.7801] },
+  { name: 'Copec Sector Sali, Salamanca',                 coord: [-70.9800, -31.7751] },
+  { name: 'Farmacia Jarufe, Salamanca',                   coord: [-70.9645, -31.7784] },
+  { name: 'Cruz Verde, Matilde Salamanca',                coord: [-70.9646, -31.7790] },
+  { name: 'Estadio Municipal N°1, Salamanca',             coord: [-70.9650, -31.7770] },
+  { name: 'Colliguay, Salamanca',                         coord: GEO.colliguay },
+  { name: 'El Tambo, Salamanca',                          coord: GEO.elTambo },
+  { name: 'Chalinga, Salamanca',                          coord: GEO.chalinga }
+];
+
+/* Puntos de interés reales de Salamanca. Cada glifo es un trazo blanco sobre
+   fondo transparente (NO trae círculo ni sombra horneados): el círculo
+   esmeralda, la sombra y el resaltado de selección se dibujan como capas
+   MapLibre nativas aparte (ver buildPOILayer), para poder animarlas y
+   atenuarlas en tiempo real sin regenerar ninguna imagen. */
+const POI_ICONS = {
+  landmark:   '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 21c-3-4-6-7.2-6-11a6 6 0 0 1 12 0c0 3.8-3 7-6 11z" stroke-linejoin="round"/><path d="M9 10c.6 1 1.7 1.6 3 1.6S14.4 11 15 10" stroke-linecap="round"/><path d="M12 4v3.4" stroke-linecap="round"/></svg>',
+  government: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 21h16M5 21V9l7-5 7 5v12M9 21v-6h6v6" stroke-linejoin="round"/></svg>',
+  church:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
+  transport:  '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="5" width="16" height="12" rx="2"/><path d="M4 13h16M7 17v2M17 17v2" stroke-linecap="round"/><circle cx="8" cy="10" r="0.6" fill="#fff"/><circle cx="16" cy="10" r="0.6" fill="#fff"/></svg>',
+  health:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
+  pharmacy:   '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M12 6v12M6 12h12" stroke-linecap="round"/></svg>',
+  cafe:       '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 5c0-1 .8-1.2.8-2M12 5c0-1 .8-1.2.8-2" stroke-linecap="round"/></svg>',
+  food:       '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v7a2 2 0 0 0 4 0V2M8 9v13"/><path d="M18 2v8a2.5 2.5 0 0 1-2.5 2.5V22"/><path d="M15.5 2v6"/></svg>',
+  market:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 12.2a2 2 0 0 0 2 1.6h7.4a2 2 0 0 0 2-1.6L21 8H6.2"/><circle cx="9.5" cy="21" r="1.3" fill="#fff" stroke="none"/><circle cx="17" cy="21" r="1.3" fill="#fff" stroke="none"/></svg>',
+  gas:        '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 21h10M16 8h1.5L20 10.5V17a1.5 1.5 0 0 1-3 0v-3h-1"/></svg>',
+  bank:       '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M9.4 10v9M14.6 10v9M19 10v9"/><path d="M3 21h18"/></svg>',
+  school:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l10-4 10 4-10 4-10-4z"/><path d="M6 10.4v4.6c0 1.3 2.7 3 6 3s6-1.7 6-3v-4.6"/><path d="M22 8v6"/></svg>',
+  police:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l7 3v6c0 5-3 8.5-7 11-4-2.5-7-6-7-11V5l7-3z"/><path d="M9.3 12l1.9 1.9L15 10"/></svg>',
+  fire:       '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4 0 6.5-2.6 6.5-6.2 0-2.7-1.6-4.4-2.6-6-1 1-1.7 1.8-2.3 1.8.5-3-1-5.3-3-6.6.4 2-.2 3.4-1.6 4.8-1.8 1.8-3 3.6-3 6C6 19.6 8 22 12 22z"/></svg>',
+  sports:     '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" stroke-linecap="round" opacity="0.7"/></svg>'
+};
+
+/* ---------- PRIORIDAD / REVELADO PROGRESIVO DE POI (estilo Google Maps) ----------
+   Cada categoría se agrupa en un "tier" de importancia. Los tier 1 (hitos
+   clave de Salamanca: hospital, plaza, municipalidad, terminal de buses)
+   aparecen desde el zoom mínimo del área. Los tier 2 (supermercados,
+   farmacias, bencineras) requieren acercarse un poco más. Los tier 3
+   (cafés, comida, iglesias, deporte) solo aparecen al acercarse bastante.
+   Esto nunca mueve ningún marcador: solo decide, según el zoom actual,
+   cuáles de los marcadores ya posicionados en sus coordenadas reales se
+   muestran u ocultan. */
+const POI_TIER = {
+  /* Tier 1 — visibles desde el zoom mínimo del área: los hitos que un
+     conductor o pasajero usa para orientarse (hospital, plaza, terminal,
+     municipalidad, bomberos, carabineros). */
+  health: 1, government: 1, landmark: 1, transport: 1, fire: 1, police: 1,
+  /* Tier 2 — comercio de uso frecuente, aparece al acercarse un poco. */
+  market: 2, pharmacy: 2, gas: 2, bank: 2, school: 2,
+  /* Tier 3 — solo al acercarse bastante (estilo Google Maps). */
+  cafe: 3, food: 3, church: 3, sports: 3
+};
+const TIER_MIN_ZOOM = { 1: 11.4, 2: 13.6, 3: 15.0 };
+
+/* Distancia (metros) a la ruta activa dentro de la cual se considera que
+   un POI queda visualmente "debajo" de la línea de ruta. No se usa para
+   ocultar POIs lejanos (eso ya lo resuelve el tier/zoom): solo sirve para
+   atenuar la opacidad de un ícono puntual que la línea verde esmeralda
+   cruza por encima, para que la ruta siempre gane la prioridad visual. */
+const ROUTE_OCCLUDE_BUFFER_M = 22;
+
+function metersBetween(c1, c2) {
+  const dx = (c2[0] - c1[0]) * Math.cos(c1[1] * Math.PI / 180) * 111320;
+  const dy = (c2[1] - c1[1]) * 110540;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/* Proyección punto→segmento en metros (plano local), usada para medir qué
+   tan cerca está un POI de la ruta real calculada por OSRM. */
+function distancePointToSegmentMeters(p, a, b) {
+  const toLocal = (c) => [(c[0] - a[0]) * Math.cos(a[1] * Math.PI / 180) * 111320, (c[1] - a[1]) * 110540];
+  const [bx, by] = toLocal(b);
+  const [px, py] = toLocal(p);
+  const abLen2 = bx * bx + by * by || 1e-9;
+  let t = (px * bx + py * by) / abLen2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = bx * t, cy = by * t;
+  const dx = px - cx, dy = py - cy;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+function distanceToRouteMeters(coord, line) {
+  if (!line || line.length < 2) return Infinity;
+  let min = Infinity;
+  for (let i = 1; i < line.length; i++) {
+    const d = distancePointToSegmentMeters(coord, line[i - 1], line[i]);
+    if (d < min) min = d;
+    if (min < 4) break;
+  }
+  return min;
+}
+
+/* Puntuación de "calidad de información" de un elemento de OSM: más tags
+   y campos útiles (dirección, horario, teléfono, web) implica una ficha
+   más completa. Se usa exclusivamente para decidir, cuando dos elementos
+   de OSM representan el mismo lugar (p.ej. la entrada y el edificio), cuál
+   de los dos conservar — nunca para mover ninguna coordenada. */
+function scorePOIQuality(tags) {
+  if (!tags) return 0;
+  let score = Object.keys(tags).length;
+  ['addr:street', 'addr:housenumber', 'opening_hours', 'phone', 'website', 'brand', 'operator'].forEach(k => {
+    if (tags[k]) score += 2;
+  });
+  return score;
+}
+
+/* Si dos elementos de OSM de la misma categoría están a menos de ~45m
+   (típico caso entrada vs. edificio, o nodo duplicado vs. polígono),
+   se conserva solo el de mayor calidad de datos. Las coordenadas del
+   ganador se dejan intactas: no se promedian ni se reubican. */
+function dedupeNearbyPOIs(pois) {
+  const sorted = pois.slice().sort((a, b) => b.quality - a.quality);
+  const kept = [];
+  sorted.forEach(poi => {
+    const dup = kept.find(k => k.category === poi.category && metersBetween(k.coord, poi.coord) < 45);
+    if (!dup) kept.push(poi);
+  });
+  return kept;
+}
+
+/* ---------- POI REALES DESDE OPENSTREETMAP (Overpass API) ----------
+   IMPORTANTE: aquí NO existe ninguna coordenada escrita a mano. Cada
+   punto de interés que se pinta en el mapa viene directamente de la
+   geometría real registrada en OpenStreetMap (Overpass), igual que en
+   Google Maps o Apple Maps: el Hospital aparece donde está el polígono
+   del edificio del hospital, la Plaza donde está el polígono de la
+   plaza, la Municipalidad donde está su edificio, etc.
+
+   Para nodes (node) se usa el punto exacto tal cual está en OSM.
+   Para ways/relations (edificios y áreas dibujadas como polígono, p.ej.
+   el edificio del hospital o el polígono de la plaza) se usa "out center",
+   que Overpass calcula como el centroide geométrico real del polígono —
+   no una aproximación nuestra, sino el propio dato de OSM.
+
+   Se hace una búsqueda doble:
+   1) por categoría de uso (amenity/shop/leisure/tourism), para cubrir
+      farmacias, supermercados, bencineras, etc.
+   2) por nombre explícito de los hitos clave de Salamanca (Plaza de
+      Armas, Municipalidad, Hospital, Terminal de Buses, Parroquia,
+      Estadio) para asegurar que esos lugares específicos se capturen
+      con su geometría real aunque el etiquetado de OSM varíe.
+
+   Si Overpass no responde o un lugar no aparece en los datos de OSM,
+   ese punto simplemente NO se dibuja — nunca se reemplaza por una
+   coordenada aproximada o inventada. */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter'
+];
+
+/* Patrones de nombre → categoría/ícono, usados solo cuando el elemento
+   YA tiene coordenadas reales de OSM pero sus tags de categoría no
+   encajan en las reglas de abajo (p.ej. viene solo con "name"). Esto
+   nunca inventa una posición: solo decide qué ícono mostrar sobre la
+   posición real que OSM ya entregó. */
+const NAME_CATEGORY_PATTERNS = [
+  { re: /plaza de armas/i,        category: 'landmark' },
+  { re: /municipalidad/i,         category: 'government' },
+  { re: /hospital/i,              category: 'health' },
+  { re: /terminal de buses|terminal rodoviario/i, category: 'transport' },
+  { re: /parroquia|iglesia/i,     category: 'church' },
+  { re: /estadio/i,               category: 'sports' },
+  { re: /farmacia|cruz verde|salcobrand|ahumada/i, category: 'pharmacy' },
+  { re: /unimarc|supermercado|super\s?bodega|hiper/i, category: 'market' },
+  { re: /copec|shell|petrobras|terpel/i, category: 'gas' },
+  { re: /caf[eé]/i,               category: 'cafe' },
+  { re: /banco|bancoestado|santander|bci|scotiabank|caja los andes|caja los héroes/i, category: 'bank' },
+  { re: /colegio|escuela|liceo|jard[ií]n infantil/i, category: 'school' },
+  { re: /carabineros|comisar[ií]a|pdi/i, category: 'police' },
+  { re: /bomberos/i,              category: 'fire' }
+];
+
+function classifyOSMTags(tags, name) {
+  if (tags) {
+    if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return 'health';
+    if (tags.amenity === 'townhall') return 'government';
+    if (tags.amenity === 'place_of_worship') return 'church';
+    if (tags.amenity === 'bus_station') return 'transport';
+    if (tags.amenity === 'cafe') return 'cafe';
+    if (tags.amenity === 'restaurant' || tags.amenity === 'fast_food') return 'food';
+    if (tags.amenity === 'fuel') return 'gas';
+    if (tags.amenity === 'pharmacy') return 'pharmacy';
+    if (tags.amenity === 'marketplace') return 'market';
+    if (tags.amenity === 'bank') return 'bank';
+    if (tags.amenity === 'school' || tags.amenity === 'kindergarten' || tags.amenity === 'college') return 'school';
+    if (tags.amenity === 'police') return 'police';
+    if (tags.amenity === 'fire_station') return 'fire';
+    if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
+    if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre') return 'sports';
+    if (tags.leisure === 'square' || tags.place === 'square') return 'landmark';
+    if (tags.tourism === 'attraction' || tags.tourism === 'museum' || tags.historic) return 'landmark';
+  }
+  if (name) {
+    const hit = NAME_CATEGORY_PATTERNS.find(p => p.re.test(name));
+    if (hit) return hit.category;
+  }
+  return null;
+}
+
+/* Bloque de búsqueda por categoría de uso (amenity/shop/leisure/tourism) */
+function categoryQueryBlock(bbox) {
+  return `
+    node["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace|bank|school|kindergarten|college|police|fire_station)$"](${bbox});
+    way["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace|bank|school|kindergarten|college|police|fire_station)$"](${bbox});
+    relation["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|school|police|fire_station)$"](${bbox});
+    node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
+    way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
+    node["leisure"~"^(stadium|sports_centre|square)$"](${bbox});
+    way["leisure"~"^(stadium|sports_centre|square)$"](${bbox});
+    relation["leisure"~"^(stadium|sports_centre)$"](${bbox});
+    node["place"="square"](${bbox});
+    way["place"="square"](${bbox});
+    node["tourism"~"^(attraction|museum)$"](${bbox});
+    way["tourism"~"^(attraction|museum)$"](${bbox});
+  `;
+}
+
+/* Bloque de búsqueda explícita por nombre de los hitos clave de Salamanca,
+   para no depender solo del etiquetado de categoría de OSM */
+function namedLandmarksQueryBlock(bbox) {
+  const namePattern = 'Plaza de Armas|Municipalidad|Hospital|Terminal de Buses|Parroquia|Estadio Municipal|Carabineros|Bomberos|Comisar[ií]a';
+  return `
+    node["name"~"${namePattern}",i](${bbox});
+    way["name"~"${namePattern}",i](${bbox});
+    relation["name"~"${namePattern}",i](${bbox});
+  `;
+}
+
+async function queryOverpass(query) {
+  let lastErr;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query)
+      });
+      if (!res.ok) throw new Error('Overpass status ' + res.status);
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr || new Error('Overpass no disponible');
+}
+
+async function fetchOSMPOIs() {
+  const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
+  const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
+  const query = `[out:json][timeout:25];(${categoryQueryBlock(bbox)}${namedLandmarksQueryBlock(bbox)});out center tags;`;
+
+  const data = await queryOverpass(query);
+
+  const seen = new Set();
+  const pois = [];
+  (data.elements || []).forEach(el => {
+    const tags = el.tags;
+    const name = tags && tags.name;
+    if (!name) return; // sin nombre real de OSM, no se etiqueta
+    const category = classifyOSMTags(tags, name);
+    if (!category) return;
+    // Coordenada real: nodo = punto exacto de OSM; way/relation = centroide
+    // real del polígono del edificio/área, calculado por Overpass ("center"),
+    // nunca una coordenada nuestra.
+    const lat = el.lat !== undefined ? el.lat : (el.center && el.center.lat);
+    const lon = el.lon !== undefined ? el.lon : (el.center && el.center.lon);
+    if (lat === undefined || lon === undefined) return; // sin geometría real, se omite
+    const key = normalize(name) + '|' + lat.toFixed(5) + ',' + lon.toFixed(5);
+    if (seen.has(key)) return;
+    seen.add(key);
+    pois.push({
+      id: `${el.type}/${el.id}`,
+      name, category, coord: [lon, lat],
+      quality: scorePOIQuality(tags)
+    });
+  });
+  // Elimina duplicados del mismo lugar (p.ej. entrada + edificio) quedándose
+  // con el elemento de mayor calidad de información, sin tocar coordenadas.
+  return dedupeNearbyPOIs(pois);
+}
+
+/* ---------- MOTOR NATIVO DE POI (GeoJSON + symbol layers) ----------
+   Los POI se cargan como UNA fuente GeoJSON (`pois`) y se pintan con
+   capas `symbol` nativas de MapLibre — el mismo mecanismo que usan
+   Google Maps y Mapbox para sus propios iconos y etiquetas. Ninguna
+   posición se calcula en píxeles de pantalla ni se corrige con CSS/
+   transform: cada feature vive en su [lon, lat] real dentro del GeoJSON,
+   y es el propio motor de render quien decide en cada frame dónde
+   dibujarlo según cámara/zoom/pitch/rotación — por eso nunca puede
+   "flotar" ni desfasarse respecto a las calles. La anti-colisión entre
+   íconos cercanos también la resuelve el motor de colocación de símbolos
+   (icon-allow-overlap:false + symbol-sort-key por prioridad), no un
+   cálculo manual en JS. */
+let ALL_POIS = [];
+const POI_SOURCE_ID = 'pois';
+const POI_SELECT_SOURCE_ID = 'poi-selected';
+/* id del POI actualmente resaltado (por búsqueda en vivo o por selección
+   explícita), o null si ninguno lo está. */
+let selectedPOIId = null;
+
+/* Cada glifo de POI_ICONS es un trazo BLANCO sobre fondo transparente — no
+   trae círculo ni sombra "horneados" en el propio raster. El círculo
+   esmeralda de marca, la sombra sutil y el anillo de resaltado de
+   selección se dibujan como capas MapLibre nativas independientes
+   (poi-shadow / poi-bg / poi-icon / poi-select-ring), lo que permite
+   animarlas y atenuarlas en tiempo real vía feature-state sin tener que
+   regenerar ninguna imagen — igual que hacen Google Maps / Uber. */
+function poiIconSVG(category) {
+  const glyph = (POI_ICONS[category] || POI_ICONS.landmark).replace(/<svg[^>]*>|<\/svg>/g, '');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24">${glyph}</svg>`;
+}
+
+function loadMapImage(svgString, name) {
+  return new Promise((resolve) => {
+    if (map.hasImage(name)) return resolve();
+    const img = new Image(40, 40);
+    img.onload = () => { if (!map.hasImage(name)) map.addImage(name, img, { pixelRatio: 2 }); resolve(); };
+    img.onerror = () => resolve();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
+  });
+}
+
+async function registerPOIIcons() {
+  await Promise.all(Object.keys(POI_ICONS).map(cat => loadMapImage(poiIconSVG(cat), 'poi-' + cat)));
+}
+
+function poiToFeature(poi) {
+  return {
+    type: 'Feature', id: poi.id,
+    geometry: { type: 'Point', coordinates: poi.coord },
+    properties: { id: poi.id, name: poi.name, category: poi.category, tier: POI_TIER[poi.category] || 3, icon: 'poi-' + poi.category }
+  };
+}
+
+/* Expresión de opacidad compartida por las capas de círculo/glifo: crece
+   suavemente dentro de la ventana de zoom propia de cada tier (fade-in por
+   zoom, estilo Google Maps), se atenúa fuerte si el feature-state marca
+   "occluded" (ruta o tarjeta encima) y siempre vuelve a opacidad plena si
+   está "selected" — la selección nunca debe quedar tapada. */
+function poiOpacityExpr(maxOpacity) {
+  const zoomFade = ['case',
+    ['==', ['get', 'tier'], 1], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[1], 0, TIER_MIN_ZOOM[1] + 0.35, maxOpacity],
+    ['==', ['get', 'tier'], 2], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[2], 0, TIER_MIN_ZOOM[2] + 0.35, maxOpacity],
+    ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[3], 0, TIER_MIN_ZOOM[3] + 0.35, maxOpacity]
+  ];
+  const dimmed = ['*', zoomFade, ['case', ['boolean', ['feature-state', 'occluded'], false], 0.16, 1]];
+  return ['case', ['boolean', ['feature-state', 'selected'], false], maxOpacity, dimmed];
+}
+
+/* Radio del círculo de fondo por tier (14–20px de diámetro, tal como pide
+   la marca), con un pequeño extra permanente mientras el POI está
+   seleccionado — el "pulso" grande (1 → 1.2 → 1) lo hace aparte el anillo
+   `poi-select-ring`, animado por JS. */
+function poiRadiusExpr() {
+  const base = ['case',
+    ['==', ['get', 'tier'], 1], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[1], 7, 17, 10],
+    ['==', ['get', 'tier'], 2], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[2], 6.5, 17, 9.5],
+    ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[3], 6, 17, 9]
+  ];
+  return ['+', base, ['case', ['boolean', ['feature-state', 'selected'], false], 1.4, 0]];
+}
+
+/* Crea la fuente GeoJSON + 4 capas nativas por encima del terreno/calles y
+   por debajo de la ruta (que se añade después, ver addRouteLayers): sombra
+   sutil, círculo esmeralda de marca, glifo blanco, y anillo de selección.
+   Todas comparten la misma jerarquía tier/zoom — ningún POI puede competir
+   visualmente con la ruta ni con los marcadores de viaje (son DOM y
+   siempre quedan por encima del canvas). */
+function buildPOILayer(pois) {
+  const data = { type: 'FeatureCollection', features: pois.map(poiToFeature) };
+  if (map.getSource(POI_SOURCE_ID)) { map.getSource(POI_SOURCE_ID).setData(data); return; }
+  map.addSource(POI_SOURCE_ID, { type: 'geojson', data, promoteId: 'id' });
+  map.addSource(POI_SELECT_SOURCE_ID, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+
+  const fadeTransition = { duration: 150 };
+
+  map.addLayer({
+    id: 'poi-shadow', type: 'circle', source: POI_SOURCE_ID,
+    minzoom: TIER_MIN_ZOOM[1],
+    paint: {
+      'circle-color': '#000000',
+      'circle-blur': 0.9,
+      'circle-translate': [0, 1.2],
+      'circle-radius': ['+', poiRadiusExpr(), 1.5],
+      'circle-opacity': poiOpacityExpr(0.35),
+      'circle-radius-transition': fadeTransition,
+      'circle-opacity-transition': fadeTransition
+    }
+  });
+
+  map.addLayer({
+    id: 'poi-bg', type: 'circle', source: POI_SOURCE_ID,
+    minzoom: TIER_MIN_ZOOM[1],
+    paint: {
+      'circle-color': ['interpolate', ['linear'], ['zoom'], 11, '#059669', 16, '#10B981'],
+      'circle-stroke-width': 1,
+      'circle-stroke-color': 'rgba(255,255,255,0.14)',
+      'circle-radius': poiRadiusExpr(),
+      'circle-opacity': poiOpacityExpr(0.92),
+      'circle-radius-transition': fadeTransition,
+      'circle-opacity-transition': fadeTransition
+    }
+  });
+
+  map.addLayer({
+    id: 'poi-icon', type: 'symbol', source: POI_SOURCE_ID,
+    minzoom: TIER_MIN_ZOOM[1],
+    layout: {
+      'icon-image': ['get', 'icon'],
+      'icon-size': ['case',
+        ['==', ['get', 'tier'], 1], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[1], 0.2, 17, 0.28],
+        ['==', ['get', 'tier'], 2], ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[2], 0.19, 17, 0.26],
+        ['interpolate', ['linear'], ['zoom'], TIER_MIN_ZOOM[3], 0.18, 17, 0.25]
+      ],
+      'icon-allow-overlap': false,
+      'icon-ignore-placement': false,
+      'symbol-sort-key': ['get', 'tier']
+    },
+    paint: {
+      'icon-opacity': poiOpacityExpr(1),
+      'icon-opacity-transition': fadeTransition
+    }
+  });
+
+  /* Anillo transitorio de selección: vive en una fuente aparte de 0/1
+     features para no tener que tocar feature-state por cada frame de la
+     animación. Arranca invisible; selectPOIById() lo anima. */
+  map.addLayer({
+    id: 'poi-select-ring', type: 'circle', source: POI_SELECT_SOURCE_ID,
+    paint: {
+      'circle-color': '#6EE7B7',
+      'circle-opacity': 0,
+      'circle-radius': 10,
+      'circle-blur': 0.35
+    }
+  });
+
+  ['poi-bg', 'poi-icon'].forEach(layerId => {
+    // Popup nativo anclado a la coordenada geográfica real del feature
+    // (maplibregl.Popup#setLngLat), nunca a una posición de pantalla.
+    map.on('click', layerId, (e) => {
+      const f = e.features && e.features[0];
+      if (!f) return;
+      selectPOIById(f.properties.id, true);
+      new maplibregl.Popup({ closeButton: false, offset: 16, className: 'poi-popup' })
+        .setLngLat(f.geometry.coordinates).setText(f.properties.name).addTo(map);
+    });
+    map.on('mouseenter', layerId, (e) => {
+      map.getCanvas().style.cursor = 'pointer';
+      const f = e.features && e.features[0];
+      if (f) highlightPOIById(f.properties.id);
+    });
+    map.on('mouseleave', layerId, () => {
+      map.getCanvas().style.cursor = '';
+      if (!searchLockedPOIId) highlightPOIById(null);
+    });
+  });
+}
+
+/* Enciende (o apaga) el estado "selected" de un POI vía feature-state —
+   esto brilla su círculo de fondo de inmediato (case en poiOpacityExpr /
+   poiRadiusExpr). No hace la animación de rebote; eso lo hace
+   selectPOIById() aparte, sobre el anillo `poi-select-ring`. */
+function highlightPOIById(id) {
+  if (selectedPOIId === id) return;
+  if (selectedPOIId) map.setFeatureState({ source: POI_SOURCE_ID, id: selectedPOIId }, { selected: false });
+  selectedPOIId = id;
+  if (id) map.setFeatureState({ source: POI_SOURCE_ID, id }, { selected: true });
+}
+
+/* id "bloqueado" mientras el usuario está escribiendo/buscando, para que
+   un mouseleave accidental sobre otro POI no le quite el resaltado al
+   resultado de búsqueda activo. */
+let searchLockedPOIId = null;
+
+let selectRingFrame = null;
+/* Selección explícita (click en el mapa o en un resultado de búsqueda):
+   ilumina el POI en esmeralda y hace el rebote de escala 1 → 1.2 → 1 que
+   pide la marca, igual que Google Maps al tocar un resultado. */
+function selectPOIById(id, bounce) {
+  const poi = ALL_POIS.find(p => p.id === id);
+  highlightPOIById(id);
+  if (!poi) return;
+  const ringSource = map.getSource(POI_SELECT_SOURCE_ID);
+  if (!ringSource) return;
+  ringSource.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: poi.coord } }] });
+  if (!bounce) return;
+  if (selectRingFrame) cancelAnimationFrame(selectRingFrame);
+  const baseR = 9, peakR = 15, duration = 340, start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / duration);
+    // 1 → 1.2 → 1 con easing "emphasized": sube rápido y relaja suave.
+    const scale = t < 0.4 ? 1 + 0.2 * (t / 0.4) : 1.2 - 0.2 * ((t - 0.4) / 0.6);
+    const eased = t < 0.4 ? 1 - Math.pow(1 - t / 0.4, 2) : 1 - Math.pow((t - 0.4) / 0.6, 2);
+    const r = baseR + (peakR - baseR) * (t < 0.4 ? eased : (1 - eased));
+    const op = 0.55 * (1 - Math.pow(t, 1.6));
+    map.setPaintProperty('poi-select-ring', 'circle-radius', r);
+    map.setPaintProperty('poi-select-ring', 'circle-opacity', Math.max(0, op));
+    selectRingFrame = t < 1 ? requestAnimationFrame(step) : null;
+  }
+  selectRingFrame = requestAnimationFrame(step);
+}
+
+/* Limpia toda selección/resaltado (usado al cerrar la búsqueda o cambiar
+   de campo). */
+function clearPOISelection() {
+  searchLockedPOIId = null;
+  highlightPOIById(null);
+  const ringSource = map.getSource(POI_SELECT_SOURCE_ID);
+  if (ringSource) ringSource.setData({ type: 'FeatureCollection', features: [] });
+}
+
+/* Busca, entre los POI reales cargados desde OSM, uno cuyo nombre calce
+   con lo que el usuario está escribiendo — así, si escribe "Hospital", el
+   ícono correspondiente se ilumina en vivo aunque no lo haya seleccionado
+   todavía de la lista de autocompletado. */
+function findPOIMatch(query) {
+  const qn = normalize(query.trim());
+  if (qn.length < 3) return null;
+  return ALL_POIS.find(p => normalize(p.name).includes(qn)) || null;
+}
+
+/* ---------- OCLUSIÓN DINÁMICA (regla 4) ----------
+   Un POI nunca debe distraer más que la ruta activa ni quedar ilegible
+   debajo de una tarjeta flotante. En vez de mover u ocultar el marcador,
+   se marca su feature-state "occluded" y son las propias expresiones de
+   opacidad (con transición de 150ms) las que lo atenúan suavemente —
+   nunca desaparece de golpe, y un POI seleccionado nunca se atenúa. */
+function getOverlappingPanelRects() {
+  const rects = [];
+  const add = (el) => { if (el) { const r = el.getBoundingClientRect(); if (r.width && r.height) rects.push(r); } };
+  const rc = document.getElementById('requestCard');
+  if (rc) add(rc);
+  const dc = document.getElementById('driverCard');
+  if (dc && dc.classList.contains('visible')) add(dc);
+  const so = document.getElementById('searchingOverlay');
+  if (so && so.classList.contains('show')) add(so.querySelector('.searching-card'));
+  return rects;
+}
+
+let occlusionPending = false;
+function updatePOIOcclusion() {
+  if (!ALL_POIS.length || occlusionPending) return;
+  occlusionPending = true;
+  requestAnimationFrame(() => {
+    occlusionPending = false;
+    const hasRoute = ROUTE_LINE && ROUTE_LINE.length > 1;
+    const panelRects = getOverlappingPanelRects();
+    if (!hasRoute && !panelRects.length) {
+      ALL_POIS.forEach(p => map.setFeatureState({ source: POI_SOURCE_ID, id: p.id }, { occluded: false }));
+      return;
+    }
+    const bounds = map.getBounds();
+    ALL_POIS.forEach(poi => {
+      if (!bounds.contains(poi.coord)) return;
+      let occluded = hasRoute && distanceToRouteMeters(poi.coord, ROUTE_LINE) <= ROUTE_OCCLUDE_BUFFER_M;
+      if (!occluded && panelRects.length) {
+        const pt = map.project(poi.coord);
+        occluded = panelRects.some(r => pt.x >= r.left && pt.x <= r.right && pt.y >= r.top && pt.y <= r.bottom);
+      }
+      map.setFeatureState({ source: POI_SOURCE_ID, id: poi.id }, { occluded });
+    });
+  });
+}
+
+/* Mantiene la oclusión al día durante ~ms mientras una tarjeta se anima
+   (bottom sheet, driver-card apareciendo, etc.) — el propio CSS transiciona
+   el layout, así que se necesita re-medir en varios frames, no solo al
+   final. */
+function pulseOcclusionUpdates(ms) {
+  const start = performance.now();
+  function tick(now) {
+    updatePOIOcclusion();
+    if (now - start < ms) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* Sin fallback aproximado: si Overpass falla o no encuentra nada, el mapa
+   simplemente no muestra puntos de interés en vez de mostrarlos en una
+   posición inventada. Se avisa al usuario y no se listan ubicaciones. */
+async function loadPOIData() {
+  try {
+    const pois = await fetchOSMPOIs();
+    ALL_POIS = pois;
+    await registerPOIIcons();
+    buildPOILayer(pois);
+    updatePOIOcclusion();
+    if (!pois.length) {
+      console.warn('OpenStreetMap no devolvió puntos de interés con nombre y geometría confirmada en esta zona.');
+    }
+  } catch (err) {
+    console.warn('No se pudo consultar OpenStreetMap (Overpass) para los puntos de interés:', err);
+    ALL_POIS = [];
+    showToast('No se pudieron cargar los puntos de interés (OpenStreetMap)');
+  }
+}
+
+function normalize(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function showToast(msg, duration = 4200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tid);
+  showToast._tid = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+/* ---------- B. MAP INIT ---------- */
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/dark',
+  center: GEO.salamanca,
+  zoom: 12.4,
+  pitch: 42,
+  bearing: -12,
+  maxBounds: AREA_BOUNDS,
+  minZoom: 11.4,
+  maxZoom: 17,
+  attributionControl: false,
+  antialias: true
+});
+
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: 'metric' }), 'bottom-left');
+
+/* El evento 'error' de MapLibre dispara para CUALQUIER recurso que falle
+   (un tile puntual fuera de rango, un glifo, un ícono de sprite) — la
+   inmensa mayoría son fallos menores y recuperables que no impiden que el
+   mapa funcione. Mostrar un toast por cada uno generaba falsas alarmas de
+   "sin conexión" con el mapa perfectamente operativo. Ahora solo se avisa
+   al usuario si el mapa nunca llega a cargar su primer estilo (fallo real
+   y bloqueante); todo lo demás queda solo en consola para depurar. */
+let mapLoadedOnce = false;
+map.once('load', () => { mapLoadedOnce = true; });
+setTimeout(() => {
+  if (!mapLoadedOnce) showToast('No se pudo cargar el mapa. Revisa tu conexión.');
+}, 12000);
+
+map.on('error', (e) => {
+  console.warn('Map error', e && e.error);
+});
+map.on('moveend', () => updatePOIOcclusion());
+map.on('zoomend', () => updatePOIOcclusion());
+
+/* ---------- C. RUTA REAL (OSRM) CON FALLBACK LOCAL ---------- */
+const OSRM_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving/';
+
+async function fetchRealRoute(origin, destination) {
+  const url = `${OSRM_ENDPOINT}${origin[0]},${origin[1]};${destination[0]},${destination[1]}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('OSRM status ' + res.status);
+  const data = await res.json();
+  if (!data.routes || !data.routes.length) throw new Error('Sin rutas OSRM');
+  return data.routes[0].geometry.coordinates.map(c => [c[0], c[1]]);
+}
+
+function chaikin(points, iterations) {
+  let pts = points;
+  for (let it = 0; it < iterations; it++) {
+    const next = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const [x0, y0] = pts[i], [x1, y1] = pts[i + 1];
+      next.push([x0 + (x1 - x0) * 0.25, y0 + (y1 - y0) * 0.25]);
+      next.push([x0 + (x1 - x0) * 0.75, y0 + (y1 - y0) * 0.75]);
+    }
+    next.push(pts[pts.length - 1]);
+    pts = next;
+  }
+  return pts;
+}
+let ROUTE_LINE = [];
+let routeLen = [0];
+let ROUTE_TOTAL = 1e-9;
+
+function computeMetrics(line) {
+  routeLen = [0];
+  for (let i = 1; i < line.length; i++) {
+    const [lon0, lat0] = line[i - 1], [lon1, lat1] = line[i];
+    const dx = (lon1 - lon0) * Math.cos(lat0 * Math.PI / 180);
+    const dy = (lat1 - lat0);
+    routeLen.push(routeLen[i - 1] + Math.sqrt(dx * dx + dy * dy));
+  }
+  ROUTE_TOTAL = routeLen[routeLen.length - 1] || 1e-9;
+}
+
+function pointAtT(tt) {
+  const target = tt * ROUTE_TOTAL;
+  let i = 1;
+  while (i < routeLen.length && routeLen[i] < target) i++;
+  i = Math.min(i, routeLen.length - 1);
+  const segLen = routeLen[i] - routeLen[i - 1] || 1e-9;
+  const segT = (target - routeLen[i - 1]) / segLen;
+  const [lon0, lat0] = ROUTE_LINE[i - 1], [lon1, lat1] = ROUTE_LINE[i];
+  return [lon0 + (lon1 - lon0) * segT, lat0 + (lat1 - lat0) * segT];
+}
+
+function addRouteLayers() {
+  if (map.getSource('route')) return; // las capas ya existen; solo se anima la data (ver animateRouteReveal)
+  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } } });
+
+  /* casing gris muy tenue, dibujado antes que todo lo demás: le da
+     profundidad a la ruta sin introducir ningún color que compita con
+     el esmeralda de marca. */
+  map.addLayer({ id: 'route-casing', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#8B99A1', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.6, 16, 6.2],
+      'line-opacity': 0.16 } });
+
+  /* glow muy sutil (verde esmeralda premium) que no compite con el mapa */
+  map.addLayer({ id: 'route-glow-wide', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#059669', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 4, 16, 11.5],
+      'line-blur': 11, 'line-opacity': 0.09 } });
+
+  map.addLayer({ id: 'route-glow-tight', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.5, 16, 6.8],
+      'line-blur': 4, 'line-opacity': 0.2 } });
+
+  /* línea principal: más fina que antes, precisión de "guía de ruta"
+     en vez de una franja gruesa que tape las calles. */
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route',
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 16, 3.4],
+      'line-opacity': 0.95 } });
+
+  let breatheT = 0;
+  setInterval(() => {
+    breatheT += 0.04;
+    const v = 0.09 + Math.sin(breatheT) * 0.025;
+    if (map.getLayer('route-glow-wide')) map.setPaintProperty('route-glow-wide', 'line-opacity', v);
+  }, 100);
+}
+
+/* Punto parcial de la ruta hasta la fracción t (0–1): reutiliza los
+   mismos vértices reales de OSRM y el mismo pointAtT() que usa el
+   "GPS ping" del vehículo, así el trazo de la animación de dibujado
+   camina exactamente sobre la calle, nunca en línea recta. */
+function partialLineAtT(t) {
+  const target = t * ROUTE_TOTAL;
+  let i = 1;
+  while (i < routeLen.length && routeLen[i] < target) i++;
+  i = Math.min(i, routeLen.length - 1);
+  const coords = ROUTE_LINE.slice(0, i);
+  coords.push(pointAtT(t));
+  return coords;
+}
+
+let routeRevealFrame = null;
+function animateRouteReveal(line) {
+  if (routeRevealFrame) cancelAnimationFrame(routeRevealFrame);
+  const source = map.getSource('route');
+  if (!source || line.length < 2) return;
+  const duration = 820;
+  const start = performance.now();
+  function step(now) {
+    const frac = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - frac, 3); // ease-out cúbico
+    source.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: partialLineAtT(eased) } });
+    routeRevealFrame = frac < 1 ? requestAnimationFrame(step) : null;
+  }
+  routeRevealFrame = requestAnimationFrame(step);
+}
+
+async function buildRoute(origin, destination) {
+  try {
+    ROUTE_LINE = await fetchRealRoute(origin, destination);
+  } catch (err) {
+    console.warn('OSRM no disponible, usando curva de respaldo:', err);
+    ROUTE_LINE = chaikin([origin, destination], 4);
+    showToast('Ruta aproximada: sin conexión al motor de ruteo (OSRM)');
+  }
+  computeMetrics(ROUTE_LINE);
+  addRouteLayers();
+  animateRouteReveal(ROUTE_LINE);
+}
+
+async function snapToRoad(coord) {
+  try {
+    const url = `https://router.project-osrm.org/nearest/v1/driving/${coord[0]},${coord[1]}?number=1`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('OSRM nearest status ' + res.status);
+    const data = await res.json();
+    const wp = data.waypoints && data.waypoints[0];
+    if (!wp) throw new Error('Sin waypoint de map matching');
+    return [wp.location[0], wp.location[1]];
+  } catch (err) {
+    console.warn('Map matching no disponible, se usa la coordenada original:', err);
+    return coord;
+  }
+}
+
+async function geocodeInArea(query) {
+  try {
+    const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=4&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&q=${encodeURIComponent(query + ', Salamanca, Choapa, Chile')}`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    if (!res.ok) throw new Error('Nominatim status ' + res.status);
+    const data = await res.json();
+    return data
+      .filter(r => r.lon >= minLon && r.lon <= maxLon && r.lat >= minLat && r.lat <= maxLat)
+      .map(r => ({ name: r.display_name.split(',').slice(0, 2).join(',').trim(), coord: [parseFloat(r.lon), parseFloat(r.lat)] }));
+  } catch (err) {
+    return [];
+  }
+}
+
+/* ---------- D. MARCADORES NATIVOS ---------- */
+let carMarker, carEl, carWrapEl, originMarker, destMarker;
+
+function buildOriginDestinationMarkers(originCoord, destCoord) {
+  // Los tres marcadores (origen, destino, auto) son maplibregl.Marker
+  // nativos: su posición vive en el motor del mapa (LngLat real, WGS84),
+  // nunca se calcula en píxeles ni se toca con CSS/transform manual sobre
+  // la raíz. rotationAlignment/pitchAlignment 'viewport' = billboard, igual
+  // que los pines de Google/Apple Maps: no se acuestan con el pitch, pero
+  // su punto de anclaje sigue el pan/zoom/rotación del mapa automáticamente.
+  const originEl = document.createElement('div');
+  originEl.className = 'pin-origin';
+  originEl.innerHTML = '<div class="ring"></div><div class="core"></div>';
+  originMarker = new maplibregl.Marker({
+    element: originEl, anchor: 'center',
+    rotationAlignment: 'viewport', pitchAlignment: 'viewport'
+  }).setLngLat(originCoord).addTo(map);
+
+  const destEl = document.createElement('div');
+  destEl.className = 'pin-dest';
+  destEl.innerHTML = `<div class="pin-dest-inner"><div class="dest-halo"></div><svg viewBox="0 0 26 34" fill="none">
+      <path d="M13 33C13 33 25 19.7 25 13C25 5.8 19.6 0 13 0C6.4 0 1 5.8 1 13C1 19.7 13 33 13 33Z" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+      <circle cx="13" cy="13" r="5" fill="#059669"/>
+    </svg></div>`;
+  destMarker = new maplibregl.Marker({
+    element: destEl, anchor: 'bottom',
+    rotationAlignment: 'viewport', pitchAlignment: 'viewport'
+  }).setLngLat(destCoord).addTo(map);
+
+  /* Vehículo cenital minimalista, con sombra suave y acabado premium */
+  carEl = document.createElement('div');
+  carEl.className = 'car-anchor';
+  carWrapEl = document.createElement('div');
+  carWrapEl.className = 'car-wrap';
+  carWrapEl.innerHTML = `<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="carBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f7fbfc"/><stop offset="55%" stop-color="#e6edef"/><stop offset="100%" stop-color="#a9b7bd"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="16" cy="27" rx="6.4" ry="1.9" fill="#000" opacity="0.25"/>
+      <rect x="11.6" y="4" width="8.8" height="23" rx="4.2" fill="url(#carBody)" stroke="#059669" stroke-width="1.1"/>
+      <rect x="13" y="9.4" width="6" height="9.4" rx="2.6" fill="#0B2733" opacity="0.85"/>
+      <circle cx="13.3" cy="7.4" r="1" fill="#FFC94A"/>
+      <circle cx="18.7" cy="7.4" r="1" fill="#FFC94A"/>
+      <rect x="12.6" y="23.4" width="2.4" height="1.1" rx="0.5" fill="#FF453A" opacity="0.8"/>
+      <rect x="17" y="23.4" width="2.4" height="1.1" rx="0.5" fill="#FF453A" opacity="0.8"/>
+    </svg>`;
+  carEl.appendChild(carWrapEl);
+  carMarker = new maplibregl.Marker({
+    element: carEl, anchor: 'center',
+    rotationAlignment: 'map', pitchAlignment: 'map'
+  }).setLngLat(ROUTE_LINE[0] || originCoord).addTo(map);
+
+  applyCarZoomScale();
+}
+
+function applyCarZoomScale() {
+  if (!carWrapEl) return;
+  const z = map.getZoom();
+  const scale = Math.max(0.62, Math.min(1.35, 1 + (z - 13) * 0.14));
+  carWrapEl.style.transform = `scale(${scale.toFixed(3)})`;
+}
+map.on('zoom', applyCarZoomScale);
+
+/* ---------- E. MOVIMIENTO DEL VEHÍCULO: "GPS ping" + interpolación suave ----------
+   En vez de recalcular la posición en cada frame de forma continua, se
+   simula el comportamiento real de una app de movilidad: la posición
+   "oficial" del vehículo se actualiza cada 2.5-3s (como un ping de GPS),
+   y entre dos pings el marcador se desliza de forma interpolada (easing)
+   tanto en posición como en rumbo, de modo que el movimiento nunca se ve
+   brusco aunque el dato de origen llegue a saltos. */
+function bearing(p1, p2) {
+  const [lon1, lat1] = [p1[0] * Math.PI / 180, p1[1] * Math.PI / 180];
+  const [lon2, lat2] = [p2[0] * Math.PI / 180, p2[1] * Math.PI / 180];
+  const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+function easeInOut(x) { return -(Math.cos(Math.PI * x) - 1) / 2; }
+function lerpAngle(a, b, t) {
+  const diff = ((b - a + 540) % 360) - 180;
+  return (a + diff * t + 360) % 360;
+}
+
+let travelT = 0, travelDir = 1, lastBearingVal = 0, pingTimer = null, travel = null;
+
+/* Rumbo local en un punto t de la ruta, calculado sobre la propia polyline
+   (tangente real de la calle en ese tramo), no sobre la cuerda entre dos
+   pings — así el auto siempre mira hacia donde realmente dobla la calle. */
+function bearingAtT(t) {
+  const eps = 0.0015;
+  const t0 = Math.max(0, t - eps);
+  const t1 = Math.min(1, t + eps);
+  const p0 = pointAtT(t0);
+  const p1 = pointAtT(t1);
+  if (p0[0] === p1[0] && p0[1] === p1[1]) return lastBearingVal;
+  return bearing(p0, p1);
+}
+
+function pickNextTarget() {
+  if (!ROUTE_LINE.length || ROUTE_LINE.length < 2) return;
+  const step = 0.16 + Math.random() * 0.05;
+  let nextT = travelT + step * travelDir;
+  if (nextT >= 1) { nextT = 1; travelDir = -1; }
+  else if (nextT <= 0) { nextT = 0; travelDir = 1; }
+  travel = { fromT: travelT, toT: nextT, tStart: performance.now(), duration: 4150 + Math.random() * 850 };
+  travelT = nextT;
+}
+
+/* El auto avanza SIEMPRE sobre la polyline real de la ruta (pointAtT camina
+   segmento a segmento sobre las calles devueltas por OSRM), nunca en línea
+   recta entre dos pings — así no se puede "cortar camino" saliéndose de la
+   calle aunque el tramo entre dos pings tenga una curva o esquina. */
+function tickCar(now) {
+  if (carMarker && travel && ROUTE_LINE.length > 1) {
+    const elapsed = now - travel.tStart;
+    const frac = Math.min(1, elapsed / travel.duration);
+    const eased = easeInOut(frac);
+    const t = travel.fromT + (travel.toT - travel.fromT) * eased;
+    const pos = pointAtT(t);
+    const brg = bearingAtT(t);
+    carMarker.setLngLat(pos);
+    carMarker.setRotation(brg);
+    lastBearingVal = brg;
+  }
+  requestAnimationFrame(tickCar);
+}
+requestAnimationFrame(tickCar);
+
+function restartTravel() {
+  travelT = 0; travelDir = 1; lastBearingVal = 0; travel = null;
+  clearInterval(pingTimer);
+  pickNextTarget();
+  pingTimer = setInterval(pickNextTarget, 4150 + Math.random() * 850);
+}
+
+/* ---------- F. CÁMARA: encuadre automático + transiciones suaves ---------- */
+/* Easing "emphasized" (ease-out cúbico): la misma sensación de frenado
+   suave que usa Google Maps al encuadrar una ruta, en vez de una curva
+   lineal o de rebote. */
+function easeOutEmphasized(t) { return 1 - Math.pow(1 - t, 3); }
+
+function fitRouteView(line, animate = true) {
+  if (!line || !line.length) return;
+  const bounds = line.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(line[0], line[0]));
+  const isNarrow = window.innerWidth < 880;
+  map.fitBounds(bounds, {
+    padding: isNarrow
+      ? { top: 70, bottom: 260, left: 24, right: 24 }
+      : { top: 90, bottom: 100, left: 320, right: 260 },
+    maxZoom: 15.3,
+    duration: animate ? 1000 : 0,
+    easing: easeOutEmphasized,
+    essential: true
+  });
+}
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => fitRouteView(ROUTE_LINE), 350);
+});
+
+/* ---------- G. ESTILO MINIMALISTA: el mapa como fondo discreto -----------
+   Se reduce el contraste de edificios, vegetación, vías secundarias y
+   etiquetas para que la atención quede en la ruta y los marcadores —
+   la misma filosofía "silver/retro atenuado" que usan Google Maps o Uber
+   cuando muestran un viaje activo. Las vías principales se mantienen
+   apenas legibles como referencia de orientación, sin competir con el
+   verde esmeralda de la ruta. */
+const ROAD_HINTS = ['road', 'street', 'highway', 'path', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'bridge', 'tunnel'];
+const LABEL_HINTS = ['road_label', 'street_label', 'highway_label', 'transportation_name'];
+const BUILDING_HINTS = ['building'];
+const VEGETATION_HINTS = ['park', 'wood', 'forest', 'vegetation', 'landcover', 'landuse', 'grass', 'golf', 'cemetery', 'garden'];
+const WATER_HINTS = ['water'];
+const MINOR_ROAD_HINTS = ['minor', 'service', 'residential', 'path', 'pedestrian', 'track'];
+const PRIMARY_ROAD_HINTS = ['motorway', 'trunk', 'primary'];
+
+function isRoadLayer(id) { return ROAD_HINTS.some(h => id.includes(h)); }
+function isRoadLabelLayer(id) { return LABEL_HINTS.some(h => id.includes(h)); }
+function hasHint(id, hints) { return hints.some(h => id.includes(h)); }
+
+function dimOpacity(layerId, prop, factor) {
+  try {
+    const current = map.getPaintProperty(layerId, prop);
+    if (current === undefined) return;
+    if (typeof current === 'number') {
+      map.setPaintProperty(layerId, prop, Math.max(0, current * factor));
+    } else {
+      map.setPaintProperty(layerId, prop, ['*', current, factor]);
+    }
+  } catch (e) { /* algunas capas no soportan la propiedad, se ignora */ }
+}
+
+function boostWidth(layerId, factor) {
+  try {
+    const current = map.getPaintProperty(layerId, 'line-width');
+    if (current === undefined || typeof current !== 'number') return;
+    map.setPaintProperty(layerId, 'line-width', current * factor);
+  } catch (e) { /* expresiones complejas de zoom se dejan intactas */ }
+}
+
+function boostHalo(layerId) {
+  try {
+    map.setPaintProperty(layerId, 'text-halo-color', 'rgba(8,10,13,0.9)');
+    const currentHalo = map.getPaintProperty(layerId, 'text-halo-width');
+    map.setPaintProperty(layerId, 'text-halo-width', typeof currentHalo === 'number' ? Math.max(currentHalo, 1.1) : 1.1);
+  } catch (e) { /* no todas las capas de símbolo tienen halo */ }
+}
+
+function applyMinimalMapStyle() {
+  const layers = map.getStyle().layers || [];
+  layers.forEach(layer => {
+    const id = layer.id;
+    if (layer.type === 'fill') {
+      if (hasHint(id, BUILDING_HINTS)) dimOpacity(id, 'fill-opacity', 0.42);
+      else if (hasHint(id, VEGETATION_HINTS)) dimOpacity(id, 'fill-opacity', 0.5);
+      else if (hasHint(id, WATER_HINTS)) {
+        dimOpacity(id, 'fill-opacity', 0.75);
+        try { map.setPaintProperty(id, 'fill-color', '#0D1319'); } catch (e) { /* color data-driven, se ignora */ }
+      }
+    }
+    if (layer.type === 'fill-extrusion') dimOpacity(id, 'fill-extrusion-opacity', 0.35);
+    if (layer.type === 'line') {
+      if (hasHint(id, MINOR_ROAD_HINTS)) { dimOpacity(id, 'line-opacity', 0.45); boostWidth(id, 0.9); }
+      else if (hasHint(id, PRIMARY_ROAD_HINTS)) { dimOpacity(id, 'line-opacity', 0.8); }
+      else if (isRoadLayer(id)) { dimOpacity(id, 'line-opacity', 0.6); }
+    }
+    if (layer.type === 'symbol') {
+      dimOpacity(id, 'text-opacity', 0.5);
+      dimOpacity(id, 'icon-opacity', 0.45);
+      if (isRoadLabelLayer(id) || id.includes('road') || id.includes('street')) boostHalo(id);
+    }
+  });
+}
+
+/* ---------- Estado del viaje + orquestación de carga ---------- */
+let currentOrigin = LOCATIONS.find(l => l.name === 'Colliguay, Salamanca');
+let currentDestination = LOCATIONS.find(l => l.name === 'Plaza de Armas, Salamanca');
+
+function updateMiniRoute() {
+  const short = (n) => n.split(',')[0].trim();
+  const text = `${short(currentOrigin.name)} → ${short(currentDestination.name)}`;
+  const el = document.getElementById('rcMiniRoute');
+  if (el) el.textContent = text;
+}
+
+async function rebuildTrip(animate = true) {
+  const originSnapped = await snapToRoad(currentOrigin.coord);
+  const destSnapped = await snapToRoad(currentDestination.coord);
+  await buildRoute(originSnapped, destSnapped);
+  if (!originMarker) {
+    buildOriginDestinationMarkers(originSnapped, destSnapped);
+  } else {
+    originMarker.setLngLat(originSnapped);
+    destMarker.setLngLat(destSnapped);
+    carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
+  }
+  restartTravel();
+  fitRouteView(ROUTE_LINE, animate);
+  updateMiniRoute();
+  // La ruta cambió: recalcula qué POI quedan ocluidos por la nueva línea
+  // de ruta (se atenúan, nunca se borran ni se ocultan de golpe).
+  updatePOIOcclusion();
+}
+
+map.on('load', async () => {
+  applyMinimalMapStyle();
+  await loadPOIData();
+  await rebuildTrip(false);
+  setTimeout(() => fitRouteView(ROUTE_LINE, true), 200);
+});
+
+/* ---------- H. INTERACCIONES DE UI ---------- */
+const swapBtn = document.getElementById('swapBtn');
+const fromText = document.getElementById('fromText');
+const toText = document.getElementById('toText');
+const fromList = document.getElementById('fromList');
+const toList = document.getElementById('toList');
+
+/* ---------- PORTAL DE AUTOCOMPLETADO (fix de causa raíz) ----------
+   fromList/toList se sacan de dentro de .field (y por tanto de dentro del
+   .request-card transformado) y se re-adjuntan como hijos directos de
+   <body>. Guardamos en el propio nodo una referencia a su input/field para
+   poder reposicionarlos en cualquier momento sin tener que buscarlos de
+   nuevo. Ver el comentario largo en la regla CSS .autocomplete-list para
+   la explicación completa del porqué. */
+function relocateAutocompleteToBody(list, input, fieldEl) {
+  document.body.appendChild(list);
+  list._acInput = input;
+  list._acField = fieldEl;
+}
+
+/* Calcula la posición real (viewport) del campo dueño de la lista y la
+   aplica al portal. Se recalcula cada vez que se muestra, y también en
+   cada resize/scroll/cambio de teclado mientras esté visible, para que
+   nunca quede desalineada del input al que pertenece. */
+function positionAutocompleteList(list) {
+  const fieldEl = list._acField;
+  if (!fieldEl) return;
+  const rect = fieldEl.getBoundingClientRect();
+  const vv = window.visualViewport;
+  const viewportH = vv ? vv.height + vv.offsetTop : window.innerHeight;
+  const viewportW = vv ? vv.width + vv.offsetLeft : window.innerWidth;
+  const left = Math.max(8, Math.min(rect.left, viewportW - rect.width - 8));
+  const spaceBelow = viewportH - rect.bottom - 10;
+  list.style.left = left + 'px';
+  list.style.width = rect.width + 'px';
+  list.style.top = (rect.bottom + 6) + 'px';
+  list.style.maxHeight = Math.max(90, Math.min(240, spaceBelow)) + 'px';
+}
+
+function showAutocompleteList(list) {
+  positionAutocompleteList(list);
+  list.classList.add('show');
+}
+
+function hideAllAutocompleteLists() {
+  [fromList, toList].forEach(l => l.classList.remove('show'));
+}
+
+function repositionVisibleAutocompleteLists() {
+  [fromList, toList].forEach(l => { if (l.classList.contains('show')) positionAutocompleteList(l); });
+}
+
+function renderList(list, results, onSelect, input) {
+  list.innerHTML = '';
+  if (!results.length) {
+    list.innerHTML = '<div class="ac-empty">Sin resultados en la zona de servicio</div>';
+  } else {
+    results.slice(0, 6).forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'ac-item';
+      item.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span></span>';
+      item.querySelector('span').textContent = r.name;
+      // pointerdown (no click) para fijar el valor ANTES de que el input
+      // pierda el foco de forma nativa — evita cualquier carrera entre el
+      // blur del input y el registro de la selección.
+      item.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        input.value = r.name;
+        list.classList.remove('show');
+        onSelect(r);
+      });
+      list.appendChild(item);
+    });
+  }
+  showAutocompleteList(list);
+}
+
+function setupAutocomplete(input, list, onSelect) {
+  const fieldEl = input.closest('.field');
+  relocateAutocompleteToBody(list, input, fieldEl);
+
+  let debounceT;
+  input.addEventListener('input', () => {
+    clearTimeout(debounceT);
+    const q = input.value.trim();
+    const qn = normalize(q);
+    let results = q.length ? LOCATIONS.filter(l => normalize(l.name).includes(qn)) : LOCATIONS.slice(0, 6);
+    renderList(list, results, onSelect, input);
+    debounceT = setTimeout(async () => {
+      if (q.length <= 2) return;
+      const live = await geocodeInArea(q);
+      const merged = results.slice();
+      live.forEach(r => { if (!merged.some(x => normalize(x.name) === normalize(r.name))) merged.push(r); });
+      if (document.activeElement === input) renderList(list, merged, onSelect, input);
+    }, 320);
+  });
+  input.addEventListener('focus', () => {
+    setSheet('expanded');
+    // Se posterga un frame para que el reflujo de `order` (fields al tope
+    // del sheet) y la altura final del panel ya estén aplicados antes de
+    // calcular dónde cae el dropdown.
+    requestAnimationFrame(() => input.dispatchEvent(new Event('input')));
+  });
+  document.addEventListener('click', (e) => {
+    // La lista ya NO es descendiente de .field (vive en <body>), así que
+    // hay que comprobar ambos contenedores explícitamente.
+    if (!fieldEl.contains(e.target) && !list.contains(e.target)) list.classList.remove('show');
+  });
+}
+
+setupAutocomplete(fromText, fromList, (loc) => { currentOrigin = loc; rebuildTrip(); });
+setupAutocomplete(toText, toList, (loc) => { currentDestination = loc; rebuildTrip(); });
+
+swapBtn.addEventListener('click', () => {
+  [currentOrigin, currentDestination] = [currentDestination, currentOrigin];
+  fromText.value = currentOrigin.name;
+  toText.value = currentDestination.name;
+  rebuildTrip();
+});
+
+function setPrice(eta, price) {
+  ['etaText'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = eta; });
+  ['priceText'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = price; });
+}
+
+document.querySelectorAll('.service-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.service-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    if (opt.dataset.service === 'enc') setPrice('18 min', '$3.200');
+    else setPrice('25 min', '$4.500');
+  });
+});
+
+/* ---------- I. FLUJO DE ESTADOS: idle -> buscando conductor -> asignado ---------- */
+const requestBtn = document.getElementById('requestBtn');
+const driverCard = document.getElementById('driverCard');
+const searchingOverlay = document.getElementById('searchingOverlay');
+const searchingText = document.getElementById('searchingText');
+const requestCard = document.getElementById('requestCard');
+const SEARCH_MESSAGES = [
+  'Buscando el mejor conductor…',
+  'Ubicando un vehículo cercano…',
+  'Conectando con un conductor disponible…'
+];
+let busy = false;
+
+function vibrate(ms) {
+  // Vibración táctil muy corta al confirmar la acción — silencioso en
+  // desktop y en cualquier navegador sin soporte (Safari iOS no lo tiene,
+  // Chrome/Android sí); nunca debe romper el flujo si falla.
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* no-op */ }
+}
+
+function startRequestFlow() {
+  if (busy) return; busy = true;
+  vibrate(15);
+  driverCard.classList.remove('visible', 'assigned');
+  carEl.classList.remove('visible');
+  // Feedback inmediato: clase + texto + disabled real, todo en el mismo
+  // frame del tap. rcExpandExtra puede seguir montado/oculto por transform
+  // sin que esto afecte al botón: ya no vive dentro de esa sección.
+  requestBtn.classList.add('loading');
+  requestBtn.textContent = 'Buscando conductor…';
+  requestBtn.disabled = true;
+  setSheet('collapsed'); // deja ver el mapa casi por completo mientras busca
+
+  let msgIdx = 0;
+  searchingText.textContent = SEARCH_MESSAGES[0];
+  searchingOverlay.classList.add('show');
+  const msgTimer = setInterval(() => {
+    msgIdx = (msgIdx + 1) % SEARCH_MESSAGES.length;
+    searchingText.textContent = SEARCH_MESSAGES[msgIdx];
+  }, 1150);
+
+  const waitTime = 2500 + Math.random() * 1500;
+  setTimeout(() => {
+    clearInterval(msgTimer);
+    searchingOverlay.classList.remove('show');
+    requestBtn.classList.remove('loading'); requestBtn.classList.add('done');
+    requestBtn.textContent = '¡Conductor asignado!';
+    vibrate(12);
+    driverCard.classList.add('visible', 'assigned');
+    restartTravel();
+    carEl.classList.add('visible');
+    setSheet('collapsed');
+    map.easeTo({ zoom: Math.min(17, map.getZoom() + 0.55), duration: 1300, essential: true });
+    setTimeout(() => {
+      requestBtn.classList.remove('done'); requestBtn.textContent = 'Solicitar movilidad';
+      requestBtn.disabled = false; busy = false;
+    }, 2600);
+  }, waitTime);
+}
+requestBtn.addEventListener('click', startRequestFlow);
+
+/* ---------- J. BOTTOM SHEET NATIVO (solo móvil): transform + spring ----------
+   Solo 2 estados — "collapsed" (~24dvh, el reposo tipo Uber) y "expanded"
+   (~50dvh, para tocar los campos/servicio) — animados EXCLUSIVAMENTE con
+   `transform: translateY()`, nunca con height/top/margin, para que el
+   navegador solo tenga que componer una capa ya rasterizada (60fps estable
+   incluso en gama media).
+
+   FIX (bug de móvil): la implementación anterior decidía "tap vs. drag"
+   con un umbral de 6px, que es demasiado sensible para un dedo real (el
+   mouse en desktop es preciso, por eso ahí no fallaba). Un toque normal en
+   touchscreen casi siempre tiene 8-15px de jitter, así que se activaba el
+   modo "drag" a mitad de un simple tap: el sheet se movía un poco visualmente
+   y, al soltar, como el desplazamiento total era mínimo, volvía a su
+   posición original — exactamente el "se abre poquito y se vuelve a
+   esconder" reportado. Además había un listener de 'click' aparte que podía
+   disparar un segundo toggle sobre el mismo gesto (conflicto touch/drag/click).
+
+   La solución: un único manejador por Pointer Events que decide el
+   resultado UNA sola vez, en pointerup, usando distancia Y tiempo total del
+   gesto (no un umbral de píxeles a mitad de camino). Un toque real siempre
+   alterna el estado sin importar el jitter; solo un arrastre sostenido
+   (más recorrido y/o más tiempo) se trata como drag real con inercia. */
+const rcHead = document.getElementById('rcHead');
+const sheetHandle = document.getElementById('sheetHandle');
+const rcExpandExtra = document.getElementById('rcExpandExtra');
+const sheetScrimEl = document.querySelector('.sheet-scrim');
+const SHEET_H_FRAC = 0.82;   // debe calzar con --sheet-h en CSS (antes 0.50 — causa raíz del bug: sheet demasiado bajo)
+const SHEET_PEEK_FRAC = 0.24; // debe calzar con --sheet-peek en CSS
+const SCRIM_MAX_OPACITY = 0.22;
+
+// Umbrales de gesto: por debajo de esto, SIEMPRE se trata como un tap
+// (alterna el estado), sin importar el micro-desplazamiento visual que
+// haya ocurrido durante el gesto.
+const TAP_MAX_MOVEMENT_PX = 12;
+const TAP_MAX_DURATION_MS = 300;
+// Recorrido mínimo antes de empezar a mover el sheet visualmente con el dedo
+// (evita que el jitter de un tap produzca un desplazamiento visible).
+const DRAG_START_THRESHOLD_PX = 10;
+
+function isMobileSheet() { return window.innerWidth <= 880; }
+function sheetMaxOffset() { return Math.round(window.innerHeight * (SHEET_H_FRAC - SHEET_PEEK_FRAC)); }
+
+function toggleMapLock(locked) {
+  if (!map) return;
+  [map.dragPan, map.scrollZoom, map.boxZoom, map.dragRotate, map.doubleClickZoom, map.touchZoomRotate, map.touchPitch, map.keyboard]
+    .forEach(h => { if (!h) return; try { locked ? h.disable() : h.enable(); } catch (e) { /* handler no disponible en esta build */ } });
+}
+
+/* Aplica una posición concreta (px) al sheet + interpola la oscuridad del
+   mapa en el mismo frame — así el "foco" se mueve hacia el panel de forma
+   perfectamente sincronizada con el dedo, no como una animación aparte. */
+function applySheetOffset(offsetPx) {
+  const maxOffset = sheetMaxOffset();
+  const clamped = Math.max(0, Math.min(maxOffset, offsetPx));
+  requestCard.style.transform = `translateY(${clamped}px)`;
+  const progress = maxOffset > 0 ? 1 - clamped / maxOffset : 0; // 0 colapsado → 1 expandido
+  if (sheetScrimEl) sheetScrimEl.style.opacity = (progress * SCRIM_MAX_OPACITY).toFixed(3);
+  updatePOIOcclusion();
+}
+
+function currentSheetOffsetPx() {
+  const t = getComputedStyle(requestCard).transform;
+  if (!t || t === 'none') return sheetMaxOffset();
+  try { return new DOMMatrixReadOnly(t).m42; } catch (e) { return sheetMaxOffset(); }
+}
+
+const mapEl = document.getElementById('map');
+
+function setSheet(state) {
+  if (!isMobileSheet()) return;
+  const wasExpanded = requestCard.dataset.sheet === 'expanded';
+  requestCard.dataset.sheet = state;
+  const expanded = state === 'expanded';
+  applySheetOffset(expanded ? 0 : sheetMaxOffset());
+  toggleMapLock(expanded);
+  // FIX (checklist: "el mapa nunca debe interceptar los eventos táctiles
+  // mientras el formulario está activo"): además de deshabilitar los
+  // handlers de interacción de MapLibre, se retira el propio elemento del
+  // mapa de la cadena de hit-testing táctil mientras el sheet está
+  // expandido. Esto es una garantía a nivel de arquitectura (no depende de
+  // que el z-index/overlap sea siempre perfecto en cada estado de la UI).
+  if (mapEl) mapEl.style.pointerEvents = expanded ? 'none' : 'auto';
+  if (sheetScrimEl) sheetScrimEl.style.pointerEvents = expanded ? 'auto' : 'none';
+  if (rcExpandExtra) { if (expanded) rcExpandExtra.removeAttribute('inert'); else rcExpandExtra.setAttribute('inert', ''); }
+  if (expanded && !wasExpanded) {
+    // Al abrir en modo búsqueda, los campos (reordenados a order:2) deben
+    // quedar visibles de inmediato en la parte superior del scroll interno.
+    requestCard.scrollTop = 0;
+  }
+  if (!expanded) {
+    // Cierra el teclado de forma explícita y oculta cualquier dropdown de
+    // sugerencias que hubiera quedado abierto al colapsar el sheet.
+    const active = document.activeElement;
+    if (active && (active === fromText || active === toText)) active.blur();
+    hideAllAutocompleteLists();
+  }
+  pulseOcclusionUpdates(320);
+}
+if (sheetScrimEl) sheetScrimEl.addEventListener('click', () => setSheet('collapsed'));
+
+/* Arma un manejador de drag por Pointer Events para un handle dado (el tirador
+   y la cabecera). TODA la decisión (tap vs. drag, y el estado final) se toma
+   una única vez dentro de `finish()` — no hay ningún listener de 'click'
+   aparte, así se elimina de raíz el conflicto entre eventos touch/drag/click
+   que causaba el doble-toggle. El mapa se bloquea desde el primer contacto
+   (pointerdown), no solo al terminar, para que nunca reciba gestos mientras
+   el usuario interactúa con la tarjeta. */
+function attachSheetDrag(el) {
+  if (!el) return;
+  el.style.touchAction = 'none';
+  let pointerId = null, startY = 0, startOffset = 0, startTime = 0;
+  let isDragging = false, lastY = 0, lastT = 0, velocity = 0;
+  let lockedByThisGesture = false;
+
+  function begin(e) {
+    if (!isMobileSheet()) return;
+    pointerId = e.pointerId;
+    startY = lastY = e.clientY;
+    startTime = lastT = performance.now();
+    startOffset = currentSheetOffsetPx();
+    isDragging = false; velocity = 0;
+    lockedByThisGesture = true;
+    toggleMapLock(true); // el mapa no debe recibir eventos táctiles mientras se interactúa con la tarjeta
+    try { el.setPointerCapture(pointerId); } catch (err) { /* no-op */ }
+  }
+  function move(e) {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    const delta = e.clientY - startY;
+    if (!isDragging && Math.abs(delta) > DRAG_START_THRESHOLD_PX) {
+      isDragging = true;
+      requestCard.classList.add('dragging');
+      if (sheetScrimEl) sheetScrimEl.classList.add('dragging');
+    }
+    if (!isDragging) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastT);
+    velocity = (e.clientY - lastY) / dt; // px/ms, para detectar "flicks"
+    lastY = e.clientY; lastT = now;
+    applySheetOffset(startOffset + delta);
+    e.preventDefault();
+  }
+  function finish(e) {
+    if (pointerId === null || e.pointerId !== pointerId) return;
+    const totalMove = Math.abs(e.clientY - startY);
+    const elapsed = performance.now() - startTime;
+
+    requestCard.classList.remove('dragging');
+    if (sheetScrimEl) sheetScrimEl.classList.remove('dragging');
+
+    let goExpanded;
+    if (!isDragging || (totalMove <= TAP_MAX_MOVEMENT_PX && elapsed <= TAP_MAX_DURATION_MS)) {
+      // Tap genuino (o jitter menor de un dedo real): siempre alterna el
+      // estado, ignorando cualquier micro-desplazamiento visual que haya
+      // podido ocurrir durante el propio toque.
+      goExpanded = requestCard.dataset.sheet !== 'expanded';
+    } else {
+      // Arrastre real y sostenido: decide por velocidad (flick) o por la
+      // posición final relativa al punto medio del recorrido.
+      const offsetNow = currentSheetOffsetPx();
+      const maxOffset = sheetMaxOffset();
+      const flick = Math.abs(velocity) > 0.5;
+      goExpanded = flick ? (velocity < 0) : (offsetNow < maxOffset * 0.5);
+    }
+    setSheet(goExpanded ? 'expanded' : 'collapsed');
+
+    pointerId = null;
+    isDragging = false;
+    lockedByThisGesture = false;
+  }
+
+  el.addEventListener('pointerdown', begin);
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', finish);
+  el.addEventListener('pointercancel', finish);
+}
+attachSheetDrag(sheetHandle);
+attachSheetDrag(rcHead);
+
+/* ---------- Teclado móvil: la tarjeta se adapta, los campos nunca quedan
+   ocultos ----------
+   Con position:fixed + bottom:0, cuando el teclado aparece el visualViewport
+   se encoge pero el layout viewport no, y el elemento fijo queda "debajo"
+   del teclado. Se mide la diferencia con la Visual Viewport API y se traslada
+   la tarjeta hacia arriba esa misma distancia (variable CSS --kb-inset, ya
+   incluida en la transición de `.request-card`), sin tocar el resto del
+   layout ni el diseño. */
+function updateKeyboardInset() {
+  if (!isMobileSheet()) { requestCard.style.removeProperty('--kb-inset'); return; }
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const inset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop));
+  requestCard.style.setProperty('--kb-inset', (inset > 4 ? inset : 0) + 'px');
+  if (inset > 4) pulseOcclusionUpdates(260);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateKeyboardInset);
+  window.visualViewport.addEventListener('scroll', updateKeyboardInset);
+}
+[fromText, toText].forEach(inp => {
+  inp.addEventListener('focus', () => setTimeout(updateKeyboardInset, 60));
+  inp.addEventListener('blur', () => setTimeout(updateKeyboardInset, 60));
+});
+
+// Reposiciona el sheet si el viewport cambia de tamaño o rota la pantalla —
+// sin esto, un resize podría dejar el sheet a medio camino.
+let sheetResizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(sheetResizeTimer);
+  sheetResizeTimer = setTimeout(() => {
+    if (isMobileSheet()) setSheet(requestCard.dataset.sheet);
+    updateKeyboardInset();
+  }, 150);
+});
+
+// Estado inicial: colapsado, mapa desbloqueado, extra fuera del árbol de foco.
+setSheet('collapsed');
+
+document.getElementById('burgerBtn').addEventListener('click', () => {
+  if (driverCard.classList.contains('assigned')) driverCard.classList.toggle('visible');
+});
+
+</script>
+</body>
+</html>
