@@ -805,10 +805,13 @@ function poiIconInnerMarkup(category) {
 function buildPoiMarkerSVG(category, active) {
   const size = 64;
   const inner = poiIconInnerMarkup(category);
-  const stroke = active ? '#6EE7B7' : 'rgba(16,185,129,0.6)';
+  const stroke = active ? '#6EE7B7' : 'rgba(16,185,129,0.5)';
   const strokeW = active ? 2.6 : 1.8;
   const bg1 = active ? 'rgba(8,90,68,0.95)' : 'rgba(20,26,22,0.92)';
   const bg2 = active ? 'rgba(5,46,35,0.95)' : 'rgba(11,15,13,0.92)';
+  /* Verde esmeralda un punto más apagado en el estado normal (el
+     seleccionado se mantiene vívido para que siga destacando). */
+  const glyphColor = active ? '#10B981' : '#0EA173';
   const glow = active ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#10B981" stroke-width="1.4" opacity="0.5"/>` : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
@@ -818,7 +821,7 @@ function buildPoiMarkerSVG(category, active) {
     </defs>
     ${glow}
     <circle cx="32" cy="32" r="26" fill="url(#poiBg-${category}-${active ? 'a' : 'n'})" stroke="${stroke}" stroke-width="${strokeW}"/>
-    <g transform="translate(18,18) scale(1.17)" fill="none" stroke="#10B981" style="color:#10B981">${inner}</g>
+    <g transform="translate(18,18) scale(1.17)" fill="none" stroke="${glyphColor}" style="color:${glyphColor}" opacity="${active ? 1 : 0.9}">${inner}</g>
   </svg>`;
 }
 
@@ -921,10 +924,22 @@ function addPOILayer(rawPois) {
 
   const sizeExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78];
   const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
+
+  /* Solo se ven siempre los POI clave (salud, gobierno, transporte, plaza,
+     bomberos); los "secundarios" (farmacia, banco, supermercado) quedan
+     ocultos hasta zoom 14, así el mapa alejado se siente limpio y con
+     espacio, y se llena de contexto solo al acercarse. */
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation'];
+  const poiOpacityExpr = ['step', ['zoom'],
+    ['match', ['get', 'category'], ESSENTIAL_POI, 0.88, 0],
+    14, 0.88
+  ];
+
   const textLayout = {
     'text-field': ['get', 'name'],
     'text-font': ['Noto Sans Regular'],
-    'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10.5, 15, 12, 17, 13],
+    /* Nombres 25% más chicos que antes (10.5/12/13 -> 8/9/10) */
+    'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 9, 17, 10],
     'text-offset': [0, 1.4],
     'text-anchor': 'top',
     'text-allow-overlap': false,
@@ -932,10 +947,14 @@ function addPOILayer(rawPois) {
     'text-max-width': 8
   };
   const textPaint = {
-    'text-color': '#EAF4F1',
-    'text-halo-color': 'rgba(6,9,12,0.92)',
-    'text-halo-width': 1.3
+    /* Gris tenue en vez de casi blanco, para que el nombre no compita
+       visualmente con la ruta (verde esmeralda) ni el destino. */
+    'text-color': '#9FADA9',
+    'text-halo-color': 'rgba(6,9,12,0.85)',
+    'text-halo-width': 1,
+    'text-opacity': poiOpacityExpr
   };
+  const iconPaint = { 'icon-opacity': poiOpacityExpr };
 
   /* MapLibre no admite expresiones de feature-state en propiedades de
      layout (icon-image, icon-size) — solo en paint. En vez de forzarlo
@@ -953,9 +972,11 @@ function addPOILayer(rawPois) {
       'icon-anchor': 'center',
       ...textLayout
     },
-    paint: textPaint
+    paint: { ...textPaint, ...iconPaint }
   });
 
+  /* El POI seleccionado por el usuario (destino elegido) siempre se ve a
+     opacidad plena, sin filtro por zoom — fue una elección explícita. */
   map.addLayer({
     id: 'poi-selected-layer', type: 'symbol', source: 'poi-selected',
     layout: {
@@ -966,7 +987,7 @@ function addPOILayer(rawPois) {
       'icon-anchor': 'center',
       ...textLayout
     },
-    paint: textPaint
+    paint: { ...textPaint, 'text-opacity': 1, 'icon-opacity': 1 }
   });
 
   map.on('click', (e) => {
@@ -1125,22 +1146,22 @@ function addRouteLayers() {
      destaca con claridad sobre el mapa sin verse exagerada. */
   map.addLayer({ id: 'route-glow', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 16, 16],
-      'line-blur': 9, 'line-opacity': 0.16 } });
+    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 16, 18],
+      'line-blur': 9, 'line-opacity': 0.2 } });
 
-  /* línea principal: nítida, sobre el halo */
+  /* línea principal: nítida, sobre el halo — un poco más gruesa para que
+     la ruta gane protagonismo frente a los POI (ahora más discretos). */
   map.addLayer({ id: 'route-line', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.9, 16, 4.2],
-      'line-opacity': 0.95 } });
+    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
+      'line-opacity': 0.97 } });
 
   let breatheT = 0;
   setInterval(() => {
     breatheT += 0.04;
-    const v = 0.16 + Math.sin(breatheT) * 0.035;
+    const v = 0.2 + Math.sin(breatheT) * 0.04;
     if (map.getLayer('route-glow')) map.setPaintProperty('route-glow', 'line-opacity', v);
   }, 100);
-}
 
 async function buildRoute(origin, destination) {
   try {
