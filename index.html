@@ -925,14 +925,33 @@ function addPOILayer(rawPois) {
         ['concat', ['get', 'category'], '-active'],
         ['get', 'category']
       ],
+      /* Íconos más grandes y con más presencia contra el fondo oscuro
+         (antes 0.34–0.6, ahora 0.42–0.78), igual que Google Maps donde
+         el pin siempre destaca sobre el mapa. */
       'icon-size': ['case',
         ['boolean', ['feature-state', 'selected'], false],
-        ['interpolate', ['linear'], ['zoom'], 11, 0.48, 14, 0.62, 17, 0.82],
-        ['interpolate', ['linear'], ['zoom'], 11, 0.34, 14, 0.44, 17, 0.6]
+        ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98],
+        ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78]
       ],
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
-      'icon-anchor': 'center'
+      'icon-anchor': 'center',
+      /* Nombre del lugar junto al ícono, igual que en Google Maps. Se
+         oculta automáticamente si dos etiquetas colisionan (text-allow-
+         overlap:false), pero el ícono siempre queda visible. */
+      'text-field': ['get', 'name'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10.5, 15, 12, 17, 13],
+      'text-offset': [0, 1.4],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+      'text-max-width': 8
+    },
+    paint: {
+      'text-color': '#EAF4F1',
+      'text-halo-color': 'rgba(6,9,12,0.92)',
+      'text-halo-width': 1.3
     }
   });
 
