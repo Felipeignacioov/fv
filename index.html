@@ -106,7 +106,7 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 
 .pin-dest{ width:19px; height:25px; position:relative; transform:translateY(-12.5px); filter: drop-shadow(0 3px 5px rgba(0,0,0,0.45)); }
 .pin-dest svg{ width:100%; height:100%; position:relative; z-index:2; }
-.pin-dest .dest-halo{ position:absolute; left:50%; bottom:1px; width:22px; height:22px; margin-left:-11px; border-radius:50%; background:radial-gradient(circle, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0) 70%); z-index:1; animation: destPulse 3.2s ease-out infinite; will-change: transform, opacity; }
+.pin-dest .dest-halo{ position:absolute; left:50%; bottom:1px; width:26px; height:26px; margin-left:-13px; border-radius:50%; background:radial-gradient(circle, rgba(16,185,129,0.4) 0%, rgba(16,185,129,0) 70%); z-index:1; animation: destPulse 3.2s ease-out infinite; will-change: transform, opacity; }
 @keyframes destPulse{ 0%{ transform:scale(.55); opacity:.6;} 70%{ opacity:.1;} 100%{ transform:scale(1.7); opacity:0;} }
 
 /* vehículo: silueta cenital (top-down), rotación por rumbo real.
@@ -118,7 +118,7 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 .car-float{ width:26px; height:26px; position:relative; left:-13px; top:-13px; animation: carFloat 2.6s ease-in-out infinite; will-change: transform; }
 .car-wrap{ width:26px; height:26px; position:relative; transform-origin:50% 50%; filter: drop-shadow(0 3px 5px rgba(0,0,0,0.5)); }
 .car-wrap svg{ width:100%; height:100%; display:block; position:relative; z-index:2; }
-.car-wrap::before{ content:''; position:absolute; left:50%; top:50%; width:38px; height:38px; margin:-19px 0 0 -19px; border-radius:50%; background:radial-gradient(circle, rgba(110,231,183,0.28) 0%, rgba(16,185,129,0.12) 55%, rgba(16,185,129,0) 72%); z-index:1; animation: carHalo 2.6s ease-in-out infinite; pointer-events:none; will-change: transform, opacity; }
+.car-wrap::before{ content:''; position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px; border-radius:50%; background:radial-gradient(circle, rgba(110,231,183,0.34) 0%, rgba(16,185,129,0.14) 55%, rgba(16,185,129,0) 72%); z-index:1; animation: carHalo 2.6s ease-in-out infinite; pointer-events:none; will-change: transform, opacity; }
 @keyframes carFloat{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-1px);} }
 @keyframes carHalo{ 0%,100%{ opacity:.6; transform:scale(1);} 50%{ opacity:.9; transform:scale(1.06);} }
 
@@ -643,7 +643,10 @@ const LOCATIONS = [
   { name: 'Colliguay, Salamanca',                         coord: GEO.colliguay },
   { name: 'El Tambo, Salamanca',                          coord: GEO.elTambo },
   { name: 'Chalinga, Salamanca', coord: GEO.chalinga },
-  { name: 'Sofit Gimnasio Salamanca, Manuel Bulnes, Salamanca', coord: [-70.9613, -31.7824] }
+  { name: 'Sofit Gimnasio Salamanca, Manuel Bulnes, Salamanca', coord: [-70.9613, -31.7824] },
+  { name: 'IEP El Tambo', coord: [-71.0226152, -31.7860923] },
+  { name: 'Colegio Tahuinco', coord: [-71.0571533, -31.7906912] },
+  { name: 'Almacén Flores, Colliguay', coord: [-71.016759, -31.8236639] }
 ];
 
 /* Puntos de interés reales de Salamanca mostrados como marcadores fijos en el mapa */
@@ -655,7 +658,9 @@ const POI_ICONS = {
   market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16l-1.5 11a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8L4 8z" stroke-linejoin="round"/><path d="M8 8V6a4 4 0 0 1 8 0v2" stroke-linecap="round"/></svg>',
   pharmacy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
   bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M4 10v9M8 10v9M12 10v9M16 10v9M20 10v9M2 21h20" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>'
+  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>',
+  church: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
+  school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke-linejoin="round"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5" stroke-linejoin="round"/></svg>'
 };
 
 /* Respaldo mínimo (solo entra en juego si Overpass no responde). Se
@@ -671,7 +676,12 @@ const POI_PLACES = [
   { name: 'Super Bodega aCuenta',       category: 'market',     coord: [-70.9621, -31.7820] },
   { name: 'Supermercado Piolín',        category: 'market',     coord: [-70.9633, -31.7822] },
   { name: 'Farmacia Jarufe',            category: 'pharmacy',   coord: [-70.9645, -31.7784] },
-  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] }
+  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] },
+  /* POI rurales del valle, verificados por el usuario vía enlace de
+     Google Maps (coordenadas reales del pin, no aproximadas). */
+  { name: 'IEP El Tambo',               category: 'church',     coord: [-71.0226152, -31.7860923] },
+  { name: 'Colegio Tahuinco',           category: 'school',     coord: [-71.0571533, -31.7906912] },
+  { name: 'Almacén Flores, Colliguay',  category: 'market',     coord: [-71.016759, -31.8236639] }
 ];
 
 /* ---------- POI REALES DESDE OPENSTREETMAP (Overpass API) ----------
@@ -756,7 +766,7 @@ function haversineMeters(a, b) {
 
 const POI_CATEGORY_PRIORITY = {
   health:0, pharmacy:1, firestation:2, government:3, bank:4,
-  transport:5, market:6, landmark:7
+  transport:5, market:6, landmark:7, church:8, school:9
 };
 
 function declutterPOIs(pois, minDistMeters = 90, maxTotal = 20) {
@@ -936,7 +946,11 @@ function addPOILayer(rawPois) {
          (hospital, municipalidad, terminal, plaza, bomberos).
        - cerca (>= 15.2): nombre de todos, incluidos los secundarios
          (farmacia, banco, supermercado). */
-  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation'];
+  /* church/school se agregan como esenciales porque son los únicos
+     referentes en localidades rurales (El Tambo, Tahuinco) — ahí no hay
+     "ruido" de otros POI con los que compitan, así que conviene que su
+     nombre aparezca ya en zoom medio. */
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'];
   const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.75, 13, 0.88];
   const textOpacityExpr = ['step', ['zoom'],
     0,
@@ -1442,19 +1456,29 @@ function boostHalo(layerId) {
 function boostStyleVisibility() {
   const layers = map.getStyle().layers || [];
   layers.forEach(layer => {
-    if (layer.type === 'line') {
-      boostOpacity(layer.id, 'line-opacity', 1.1);
-      if (isRoadLayer(layer.id)) {
-        boostOpacity(layer.id, 'line-opacity', 1.28);
-        boostWidth(layer.id, 1.18);
+    if (layer.type === 'line' && isRoadLayer(layer.id)) {
+      if (isMajorRoadLayer(layer.id)) {
+        /* Vías principales: más contraste y cuerpo — son el "esqueleto"
+           visual del mapa y deben leerse primero. */
+        boostOpacity(layer.id, 'line-opacity', 1.32);
+        boostWidth(layer.id, 1.22);
+      } else {
+        /* Vías secundarias: se atenúan levemente (no desaparecen) para
+           crear profundidad y que el ojo priorice las principales. */
+        boostOpacity(layer.id, 'line-opacity', 0.86);
       }
     }
     if (layer.type === 'symbol') {
-      boostOpacity(layer.id, 'text-opacity', 1.2);
-      boostOpacity(layer.id, 'icon-opacity', 1.15);
       if (isRoadLabelLayer(layer.id) || layer.id.includes('road') || layer.id.includes('street')) {
         boostHalo(layer.id);
-        boostOpacity(layer.id, 'text-opacity', 1.15);
+        boostOpacity(layer.id, 'text-opacity', 1.1);
+      } else {
+        /* Resto de etiquetas del estilo base (nombres de lugares, POI
+           genéricos que trae el propio mapa) se atenúan para bajar el
+           ruido visual: la ruta, el vehículo y el destino deben ser el
+           centro de atención, no el nombre de cada calle o barrio. */
+        boostOpacity(layer.id, 'text-opacity', 0.7);
+        boostOpacity(layer.id, 'icon-opacity', 0.7);
       }
     }
   });
@@ -1575,7 +1599,7 @@ function addAmbientCityGlow() {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 26, 14, 70, 17, 190],
           'circle-color': '#E8C48C',
           'circle-blur': 1,
-          'circle-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.045, 15, 0.085]
+          'circle-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.06, 15, 0.11]
         }
       }, beforeId);
     } catch (e) { /* si no se puede insertar antes de esa capa, se omite sin romper el mapa */ }
@@ -1595,7 +1619,7 @@ function addAmbientCityGlow() {
         'line-color': '#E8C48C',
         'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3.5, 16, 11],
         'line-blur': 6,
-        'line-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.05, 16, 0.09]
+        'line-opacity': ['interpolate', ['linear'], ['zoom'], 11, 0.065, 16, 0.12]
       }
     };
     if (layer['source-layer']) spec['source-layer'] = layer['source-layer'];
