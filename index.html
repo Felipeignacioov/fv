@@ -1769,12 +1769,16 @@ function makeCutoffMaskPolygon(cutCoord, startKm, widthKm, extendKm) {
    viñeta) en vez de una línea tajante — y el ancho ahora es mucho mayor
    (220 km) para que las puntas de cada franja queden siempre fuera de
    cámara, sin importar el nivel de zoom. */
+/* Todas las franjas arrancan DESPUÉS del punto de corte (startKm > 0),
+   nunca antes — así el pueblo/nombre del límite (Panguesillo, San
+   Agustín, etc.) queda siempre completamente visible y sin tapar; el
+   degradado empieza un poco más allá y se cierra en 220 km. */
 const CUTOFF_BANDS = [
-  { startKm: -6, opacity: 0.18 },
-  { startKm: -2, opacity: 0.32 },
-  { startKm: 2,  opacity: 0.5 },
-  { startKm: 6,  opacity: 0.75 },
-  { startKm: 12, opacity: 0.97 }
+  { startKm: 3,  opacity: 0.18 },
+  { startKm: 6,  opacity: 0.32 },
+  { startKm: 10, opacity: 0.5 },
+  { startKm: 15, opacity: 0.75 },
+  { startKm: 22, opacity: 0.97 }
 ];
 
 function addRouteCutoffMasks() {
