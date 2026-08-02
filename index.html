@@ -880,6 +880,10 @@ function clearPoiSelection() {
 }
 
 function selectPOI(feature) {
+  /* Selección exclusiva: siempre se limpia la anterior (popup incluido)
+     ANTES de mostrar la nueva, así nunca pueden coexistir dos tarjetas
+     "Usar como destino" en pantalla, igual que en Uber/Google Maps. */
+  clearPoiSelection();
   selectedPoiId = feature.id;
   if (map.getSource('poi-selected')) {
     map.getSource('poi-selected').setData({ type: 'FeatureCollection', features: [feature] });
@@ -998,6 +1002,13 @@ function addPOILayer(rawPois) {
   ['poi-layer', 'poi-selected-layer'].forEach(id => {
     map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
+
+  /* Click fuera del mapa (paneles, botones, etc.) también limpia la
+     selección activa — no solo los clics dentro del canvas del mapa. */
+  document.addEventListener('click', (e) => {
+    if (selectedPoiId === null) return;
+    if (!map.getContainer().contains(e.target)) clearPoiSelection();
   });
 }
 
