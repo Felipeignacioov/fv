@@ -1769,17 +1769,27 @@ function makeCutoffMaskPolygon(cutCoord, startKm, widthKm, extendKm) {
    viñeta) en vez de una línea tajante — y el ancho ahora es mucho mayor
    (220 km) para que las puntas de cada franja queden siempre fuera de
    cámara, sin importar el nivel de zoom. */
-/* Todas las franjas arrancan DESPUÉS del punto de corte (startKm > 0),
-   nunca antes — así el pueblo/nombre del límite (Panguesillo, San
-   Agustín, etc.) queda siempre completamente visible y sin tapar; el
-   degradado empieza un poco más allá y se cierra en 220 km. */
-const CUTOFF_BANDS = [
-  { startKm: 1.5, opacity: 0.18 },
-  { startKm: 3.5, opacity: 0.32 },
-  { startKm: 6,   opacity: 0.5 },
-  { startKm: 9,   opacity: 0.75 },
-  { startKm: 13,  opacity: 0.97 }
-];
+/* En vez de una lista fija de saltos grandes (lo que se percibía como
+   una "máscara" con bordes), se genera una progresión de muchos pasos
+   (40) con una curva de aceleración cúbica: los primeros pasos casi no
+   suman opacidad y los últimos cierran rápido. La diferencia entre un
+   paso y el siguiente es tan chica que el ojo la lee como un
+   desvanecimiento continuo, no como un borde — el mismo recurso que usan
+   las apps de movilidad de alta gama para que el mapa "se apague" solo,
+   sin que se note dónde empieza el efecto. Todas las franjas siguen
+   arrancando DESPUÉS del punto de corte, así el nombre del pueblo límite
+   (Panguesillo, San Agustín, etc.) queda siempre limpio. */
+function buildCutoffBands(steps = 40, startKm = 1.5, endKm = 13, maxOpacity = 0.97) {
+  const bands = [];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const eased = t * t * t;
+    const km = startKm + (endKm - startKm) * t;
+    bands.push({ startKm: km, opacity: eased * maxOpacity });
+  }
+  return bands;
+}
+const CUTOFF_BANDS = buildCutoffBands();
 
 function addRouteCutoffMasks() {
   ROUTE_CUTOFFS.forEach(cut => {
