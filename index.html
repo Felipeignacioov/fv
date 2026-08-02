@@ -106,7 +106,7 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 /* =====================================================================
    3) CUSTOM MAP MARKERS
    ===================================================================== */
-.pin-origin{ width:16px; height:16px; position:relative; }
+.pin-origin{ width:16px; height:16px; position:relative; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
 .pin-origin .core{ width:100%; height:100%; border-radius:50%; background:#0B0F14; border:2px solid var(--accent-2); box-shadow:0 0 8px rgba(16,185,129,0.55); }
 .pin-origin .core::after{ content:''; position:absolute; inset:4px; border-radius:50%; background:var(--accent-2); }
 .pin-origin .ring{ position:absolute; inset:-10px; border-radius:50%; border:1.5px solid var(--accent-2); opacity:0; animation: pinPulse 2.8s ease-out infinite; will-change: transform, opacity; }
@@ -961,9 +961,17 @@ function addPOILayer(rawPois) {
   map.addSource('pois', { type: 'geojson', data });
   map.addSource('poi-selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-  const sizeExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78];
+  /* Jerarquía de tamaño: los POI esenciales (salud, gobierno, transporte,
+     plaza, bomberos, iglesia, colegio) se ven un poco más grandes que los
+     secundarios (farmacia, banco, supermercado) en el mismo zoom — el ojo
+     va primero a lo importante, igual que en Uber/Google Maps, donde un
+     hospital pesa más visualmente que un comercio menor. */
+  const ESSENTIAL_POI_SIZE = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'];
+  const sizeExpr = ['match', ['get', 'category'], ESSENTIAL_POI_SIZE,
+    ['interpolate', ['linear'], ['zoom'], 11, 0.46, 14, 0.6, 17, 0.84],
+    ['interpolate', ['linear'], ['zoom'], 11, 0.36, 14, 0.48, 17, 0.68]
+  ];
   const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
-
   /* Todos los íconos son visibles desde lejos (nunca dependen de la
      categoría) — lo que cambia con el zoom es únicamente el NOMBRE:
        - alejado (zoom < 13.5): solo íconos, sin ningún nombre.
@@ -1092,7 +1100,14 @@ const map = new maplibregl.Map({
   minZoom: 11.4,
   maxZoom: 17,
   attributionControl: false,
-  antialias: true
+  antialias: true,
+  /* Inercia con más "peso": el mapa sigue deslizando un poco después de
+     soltar el gesto, con una curva de frenado progresiva en vez del tope
+     seco por defecto — la misma sensación de fluidez premium al arrastrar
+     o hacer zoom que Uber/Bolt. Es solo física de interacción que
+     MapLibre ya trae de fábrica, no una función nueva. */
+  dragPan: { linearity: 0.18, easing: (t) => t, deceleration: 1800, maxSpeed: 1300 },
+  fadeDuration: 250
 });
 
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -1522,12 +1537,12 @@ function boostStyleVisibility() {
       if (isMajorRoadLayer(layer.id)) {
         /* Vías principales: más contraste y cuerpo — son el "esqueleto"
            visual del mapa y deben leerse primero. */
-        boostOpacity(layer.id, 'line-opacity', 1.32);
-        boostWidth(layer.id, 1.22);
+        boostOpacity(layer.id, 'line-opacity', 1.4);
+        boostWidth(layer.id, 1.28);
       } else {
-        /* Vías secundarias: se atenúan levemente (no desaparecen) para
-           crear profundidad y que el ojo priorice las principales. */
-        boostOpacity(layer.id, 'line-opacity', 0.86);
+        /* Vías secundarias: se atenúan un poco más para crear profundidad
+           real y que el ojo priorice las principales de inmediato. */
+        boostOpacity(layer.id, 'line-opacity', 0.78);
       }
     }
     if (layer.type === 'symbol') {
