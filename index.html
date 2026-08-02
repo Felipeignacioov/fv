@@ -89,6 +89,14 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
   font-size:9px !important; backdrop-filter: blur(10px);
 }
 .maplibregl-ctrl-attrib a{ color:var(--text-tertiary) !important; }
+/* El canvas de MapLibre es enfocable por teclado y el navegador le
+   dibuja un contorno azul de foco por defecto al hacer click/arrastrar
+   — no tiene relación con los límites del mapa. Se reemplaza por un
+   halo esmeralda muy sutil, acorde a la identidad de la app, en vez de
+   quitarlo sin más (mantener accesibilidad de foco). */
+.maplibregl-canvas:focus{ outline:none; }
+.maplibregl-canvas-container{ outline:none; }
+#map:focus-within{ box-shadow: inset 0 0 0 1px rgba(16,185,129,0.18); }
 .maplibregl-ctrl-scale{
   background: var(--glass-fill) !important; border-color: var(--border-glass-strong) !important;
   color: var(--text-secondary) !important; font-family:'JetBrains Mono',monospace !important; font-size:9.5px !important;
@@ -638,7 +646,7 @@ const AREA_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM);
 /* Zona de navegación del mapa (maxBounds): un 12% más ancha solo para que
    el usuario tenga aire antes de topar con el borde — no se usa para
    pedir datos, solo para el límite de paneo/zoom del mapa. */
-const MAP_NAV_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM * 1.12);
+const MAP_NAV_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM * 1.2);
 
 const LOCATIONS = [
   { name: 'Plaza de Armas, Salamanca',                    coord: GEO.salamanca },
@@ -1097,7 +1105,7 @@ map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: 'metric' }), 'b
    Salamanca y, si se pasa del radio permitido, se reproyecta el centro
    de vuelta sobre el borde del círculo en la misma dirección — así el
    usuario siente un tope suave, no un choque contra una esquina recta. */
-const MAX_NAV_RADIUS_KM = RADIUS_KM * 1.12;
+const MAX_NAV_RADIUS_KM = RADIUS_KM * 1.2;
 
 function clampMapToRadius() {
   const c = map.getCenter();
@@ -1672,6 +1680,33 @@ function addAmbientCityGlow() {
     try { map.addLayer(spec, layer.id); } catch (e) { /* fuente/filtro incompatible: se omite sin romper el mapa */ }
   });
 }
+/* ---------- Nombres de lugares que no queremos mostrar nunca ----------
+   Estas localidades quedan fuera de la zona real de viajes (no son
+   origen/destino posible), así que su nombre solo agrega ruido visual.
+   Se ocultan buscando, en TODAS las capas de símbolo del estilo base
+   cuyo texto usa la propiedad "name" (nombres de calles, lugares, etc.),
+   cualquier feature cuyo nombre coincida — sin tocar nuestra propia capa
+   de POI (poi-layer / poi-selected-layer), que usa "name" con otro
+   propósito y no debe filtrarse por esta lista. */
+const HIDDEN_PLACE_NAMES = [
+  'Quebrada de Michio', 'Huintil', 'Huintil Norte', 'La Capilla',
+  'Cárcamo', 'Carcamo', 'Lanco', 'Lanco Alto'
+];
+
+function hidePlaceNamesByBlacklist() {
+  const layers = map.getStyle().layers || [];
+  layers.forEach(layer => {
+    if (layer.type !== 'symbol') return;
+    if (layer.id === 'poi-layer' || layer.id === 'poi-selected-layer') return;
+    const textField = layer.layout && layer.layout['text-field'];
+    const usesName = textField && JSON.stringify(textField).includes('"name"');
+    if (!usesName) return;
+    const excludeExpr = ['!', ['in', ['get', 'name'], ['literal', HIDDEN_PLACE_NAMES]]];
+    const newFilter = layer.filter ? ['all', layer.filter, excludeExpr] : excludeExpr;
+    try { map.setFilter(layer.id, newFilter); } catch (e) { /* alguna capa puede no aceptar filtro */ }
+  });
+}
+
 /* ---------- Cortes de visibilidad por ruta rural ----------
    Más allá de ciertos puntos (límite del área realmente operativa/
    mapeada), no queremos mostrar ni calles ni nombres de localidades,
@@ -1763,6 +1798,7 @@ async function rebuildTrip(animate = true) {
 
 map.on('load', async () => {
   boostStyleVisibility();
+  hidePlaceNamesByBlacklist();
   tintWaterLayers();
   tintGreenLayers();
   boostDepthLayers();
