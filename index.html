@@ -1774,11 +1774,11 @@ function makeCutoffMaskPolygon(cutCoord, startKm, widthKm, extendKm) {
    Agustín, etc.) queda siempre completamente visible y sin tapar; el
    degradado empieza un poco más allá y se cierra en 220 km. */
 const CUTOFF_BANDS = [
-  { startKm: 3,  opacity: 0.18 },
-  { startKm: 6,  opacity: 0.32 },
-  { startKm: 10, opacity: 0.5 },
-  { startKm: 15, opacity: 0.75 },
-  { startKm: 22, opacity: 0.97 }
+  { startKm: 1.5, opacity: 0.18 },
+  { startKm: 3.5, opacity: 0.32 },
+  { startKm: 6,   opacity: 0.5 },
+  { startKm: 9,   opacity: 0.75 },
+  { startKm: 13,  opacity: 0.97 }
 ];
 
 function addRouteCutoffMasks() {
