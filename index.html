@@ -1126,7 +1126,16 @@ function clampMapToRadius() {
   );
   map.setCenter([newLon * 180 / Math.PI, newLat * 180 / Math.PI]);
 }
-map.on('move', clampMapToRadius);
+map.on('moveend', (e) => {
+  /* Solo se aplica a gestos reales del usuario (arrastrar/pellizcar). Si
+     también se interviniera durante movimientos programáticos propios
+     (fitBounds, easeTo de la ruta), ambos sistemas de cámara competirían
+     entre sí y el mapa se siente "pegado" cerca del borde — por eso se
+     espera a que el gesto termine (moveend) en vez de corregir en cada
+     frame mientras se arrastra (move). */
+  if (!e.originalEvent) return;
+  clampMapToRadius();
+});
 /* ---------- Estado de carga real del mapa (spinner -> listo / error real) ---------- */
 let mapLoaded = false;
 let mapLoadTimeout = null;
@@ -1743,27 +1752,44 @@ function offsetCoord(coord, distKm, bearingRad) {
    corte y se extiende bien lejos hacia afuera — cubre cualquier calle o
    nombre visible pasado ese límite, sin importar cuánto se aleje el
    usuario dentro del margen de navegación. */
-function makeCutoffMaskPolygon(cutCoord, widthKm = 80, extendKm = 60) {
+function makeCutoffMaskPolygon(cutCoord, startKm, widthKm, extendKm) {
   const outwardBrg = bearing(GEO.salamanca, cutCoord) * Math.PI / 180;
   const perpBrg = outwardBrg + Math.PI / 2;
-  const p1 = offsetCoord(cutCoord, widthKm / 2, perpBrg);
-  const p2 = offsetCoord(cutCoord, widthKm / 2, perpBrg + Math.PI);
+  const start = startKm === 0 ? cutCoord : offsetCoord(cutCoord, startKm, outwardBrg);
+  const p1 = offsetCoord(start, widthKm / 2, perpBrg);
+  const p2 = offsetCoord(start, widthKm / 2, perpBrg + Math.PI);
   const p1far = offsetCoord(p1, extendKm, outwardBrg);
   const p2far = offsetCoord(p2, extendKm, outwardBrg);
   return [[p1, p1far, p2far, p2, p1]];
 }
 
+/* En vez de un solo bloque opaco con borde recto y duro, se apilan varias
+   franjas: cada una arranca un poco más lejos del punto de corte y con
+   más opacidad, así el resultado visual es un degradado suave (tipo
+   viñeta) en vez de una línea tajante — y el ancho ahora es mucho mayor
+   (220 km) para que las puntas de cada franja queden siempre fuera de
+   cámara, sin importar el nivel de zoom. */
+const CUTOFF_BANDS = [
+  { startKm: -6, opacity: 0.18 },
+  { startKm: -2, opacity: 0.32 },
+  { startKm: 2,  opacity: 0.5 },
+  { startKm: 6,  opacity: 0.75 },
+  { startKm: 12, opacity: 0.97 }
+];
+
 function addRouteCutoffMasks() {
   ROUTE_CUTOFFS.forEach(cut => {
-    const srcId = 'cutoff-' + cut.id;
-    if (map.getSource(srcId)) return;
-    map.addSource(srcId, {
-      type: 'geojson',
-      data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: makeCutoffMaskPolygon(cut.coord) } }
-    });
-    map.addLayer({
-      id: 'cutoff-layer-' + cut.id, type: 'fill', source: srcId,
-      paint: { 'fill-color': '#0A0E13', 'fill-opacity': 0.97 }
+    CUTOFF_BANDS.forEach((band, i) => {
+      const srcId = `cutoff-${cut.id}-${i}`;
+      if (map.getSource(srcId)) return;
+      map.addSource(srcId, {
+        type: 'geojson',
+        data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: makeCutoffMaskPolygon(cut.coord, band.startKm, 220, 100) } }
+      });
+      map.addLayer({
+        id: `cutoff-layer-${cut.id}-${i}`, type: 'fill', source: srcId,
+        paint: { 'fill-color': '#0A0E13', 'fill-opacity': band.opacity }
+      });
     });
   });
 }
