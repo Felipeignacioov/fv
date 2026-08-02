@@ -929,14 +929,19 @@ function addPOILayer(rawPois) {
   const sizeExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78];
   const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
 
-  /* Solo se ven siempre los POI clave (salud, gobierno, transporte, plaza,
-     bomberos); los "secundarios" (farmacia, banco, supermercado) quedan
-     ocultos hasta zoom 14, así el mapa alejado se siente limpio y con
-     espacio, y se llena de contexto solo al acercarse. */
+  /* Todos los íconos son visibles desde lejos (nunca dependen de la
+     categoría) — lo que cambia con el zoom es únicamente el NOMBRE:
+       - alejado (zoom < 13.5): solo íconos, sin ningún nombre.
+       - distancia media (13.5–15.2): solo el nombre de los POI clave
+         (hospital, municipalidad, terminal, plaza, bomberos).
+       - cerca (>= 15.2): nombre de todos, incluidos los secundarios
+         (farmacia, banco, supermercado). */
   const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation'];
-  const poiOpacityExpr = ['step', ['zoom'],
-    ['match', ['get', 'category'], ESSENTIAL_POI, 0.88, 0],
-    14, 0.88
+  const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.75, 13, 0.88];
+  const textOpacityExpr = ['step', ['zoom'],
+    0,
+    13.5, ['match', ['get', 'category'], ESSENTIAL_POI, 1, 0],
+    15.2, 1
   ];
 
   const textLayout = {
@@ -956,9 +961,9 @@ function addPOILayer(rawPois) {
     'text-color': '#9FADA9',
     'text-halo-color': 'rgba(6,9,12,0.85)',
     'text-halo-width': 1,
-    'text-opacity': poiOpacityExpr
+    'text-opacity': textOpacityExpr
   };
-  const iconPaint = { 'icon-opacity': poiOpacityExpr };
+  const iconPaint = { 'icon-opacity': iconOpacityExpr };
 
   /* MapLibre no admite expresiones de feature-state en propiedades de
      layout (icon-image, icon-size) — solo en paint. En vez de forzarlo
