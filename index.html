@@ -963,13 +963,18 @@ function addPOILayer(rawPois) {
 
   /* Jerarquía de tamaño: los POI esenciales (salud, gobierno, transporte,
      plaza, bomberos, iglesia, colegio) se ven un poco más grandes que los
-     secundarios (farmacia, banco, supermercado) en el mismo zoom — el ojo
-     va primero a lo importante, igual que en Uber/Google Maps, donde un
-     hospital pesa más visualmente que un comercio menor. */
-  const ESSENTIAL_POI_SIZE = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'];
-  const sizeExpr = ['match', ['get', 'category'], ESSENTIAL_POI_SIZE,
-    ['interpolate', ['linear'], ['zoom'], 11, 0.46, 14, 0.6, 17, 0.84],
-    ['interpolate', ['linear'], ['zoom'], 11, 0.36, 14, 0.48, 17, 0.68]
+     secundarios (farmacia, banco, supermercado) en el mismo zoom. MapLibre
+     no permite anidar dos expresiones de zoom (interpolate) dentro de una
+     misma propiedad, así que en vez de un "match" que elija entre dos
+     interpolate completos, se usa UN solo interpolate de zoom y, en cada
+     parada, un "match" que decide el tamaño según la categoría. */
+  const isEssentialSize = ['match', ['get', 'category'],
+    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'], true, false
+  ];
+  const sizeExpr = ['interpolate', ['linear'], ['zoom'],
+    11, ['case', isEssentialSize, 0.46, 0.36],
+    14, ['case', isEssentialSize, 0.6, 0.48],
+    17, ['case', isEssentialSize, 0.84, 0.68]
   ];
   const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
   /* Todos los íconos son visibles desde lejos (nunca dependen de la
