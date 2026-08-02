@@ -1090,7 +1090,35 @@ const map = new maplibregl.Map({
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
 map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: 'metric' }), 'bottom-left');
+/* ---------- Límite circular real de navegación ---------- */
+/* maxBounds (MAP_NAV_BOUNDS) es solo una caja de seguridad; el límite
+   real es este círculo de RADIUS_KM*1.12 alrededor de Salamanca. En cada
+   movimiento se mide la distancia del centro actual al centro de
+   Salamanca y, si se pasa del radio permitido, se reproyecta el centro
+   de vuelta sobre el borde del círculo en la misma dirección — así el
+   usuario siente un tope suave, no un choque contra una esquina recta. */
+const MAX_NAV_RADIUS_KM = RADIUS_KM * 1.12;
 
+function clampMapToRadius() {
+  const c = map.getCenter();
+  const centerArr = [c.lng, c.lat];
+  const distKm = haversineMeters(GEO.salamanca, centerArr) / 1000;
+  if (distKm <= MAX_NAV_RADIUS_KM) return;
+
+  const brgDeg = bearing(GEO.salamanca, centerArr);
+  const brgRad = brgDeg * Math.PI / 180;
+  const R = 6371;
+  const angDist = MAX_NAV_RADIUS_KM / R;
+  const latRad = GEO.salamanca[1] * Math.PI / 180;
+  const lonRad = GEO.salamanca[0] * Math.PI / 180;
+  const newLat = Math.asin(Math.sin(latRad) * Math.cos(angDist) + Math.cos(latRad) * Math.sin(angDist) * Math.cos(brgRad));
+  const newLon = lonRad + Math.atan2(
+    Math.sin(brgRad) * Math.sin(angDist) * Math.cos(latRad),
+    Math.cos(angDist) - Math.sin(latRad) * Math.sin(newLat)
+  );
+  map.setCenter([newLon * 180 / Math.PI, newLat * 180 / Math.PI]);
+}
+map.on('move', clampMapToRadius);
 /* ---------- Estado de carga real del mapa (spinner -> listo / error real) ---------- */
 let mapLoaded = false;
 let mapLoadTimeout = null;
@@ -1644,7 +1672,66 @@ function addAmbientCityGlow() {
     try { map.addLayer(spec, layer.id); } catch (e) { /* fuente/filtro incompatible: se omite sin romper el mapa */ }
   });
 }
+/* ---------- Cortes de visibilidad por ruta rural ----------
+   Más allá de ciertos puntos (límite del área realmente operativa/
+   mapeada), no queremos mostrar ni calles ni nombres de localidades,
+   aunque el usuario alcance a ver esa zona en el borde del mapa. Se
+   genera, por cada punto de corte, un polígono "cuña" que arranca justo
+   en ese punto y cubre todo el terreno más allá (en la dirección
+   contraria al centro de Salamanca), pintado del mismo color de fondo
+   del mapa y por encima de las capas de calles/etiquetas del estilo
+   base — visualmente equivale a que esa zona no exista en el mapa. */
+const ROUTE_CUTOFFS = [
+  { id: 'd81',        coord: [-71.11981327386424, -31.72805442843569] },  // D-81, hasta Peralillo
+  { id: 'd825',        coord: [-70.86959264284776, -31.84023991485164] }, // D-825, hasta Panguesillo
+  { id: 'd377e',       coord: [-71.15482168637043, -31.79060238833763] }, // D-377-E, hasta Socavón Bajo
+  { id: 'd845',        coord: [-70.82843277194782, -31.728861367046648] }, // D-845, hasta San Agustín
+  { id: 'd835',        coord: [-70.83985690237047, -31.85183447330851] }, // D-835, hasta Llimpo
+  { id: 'd847',        coord: [-70.95224806372215, -31.883684540869584] } // D-847, hasta El Arrayán
+];
 
+function offsetCoord(coord, distKm, bearingRad) {
+  const R = 6371;
+  const angDist = distKm / R;
+  const latRad = coord[1] * Math.PI / 180;
+  const lonRad = coord[0] * Math.PI / 180;
+  const newLat = Math.asin(Math.sin(latRad) * Math.cos(angDist) + Math.cos(latRad) * Math.sin(angDist) * Math.cos(bearingRad));
+  const newLon = lonRad + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angDist) * Math.cos(latRad),
+    Math.cos(angDist) - Math.sin(latRad) * Math.sin(newLat)
+  );
+  return [newLon * 180 / Math.PI, newLat * 180 / Math.PI];
+}
+
+/* Cuña de máscara: una franja ancha perpendicular a la dirección de la
+   ruta (respecto del centro de Salamanca), que arranca en el punto de
+   corte y se extiende bien lejos hacia afuera — cubre cualquier calle o
+   nombre visible pasado ese límite, sin importar cuánto se aleje el
+   usuario dentro del margen de navegación. */
+function makeCutoffMaskPolygon(cutCoord, widthKm = 80, extendKm = 60) {
+  const outwardBrg = bearing(GEO.salamanca, cutCoord) * Math.PI / 180;
+  const perpBrg = outwardBrg + Math.PI / 2;
+  const p1 = offsetCoord(cutCoord, widthKm / 2, perpBrg);
+  const p2 = offsetCoord(cutCoord, widthKm / 2, perpBrg + Math.PI);
+  const p1far = offsetCoord(p1, extendKm, outwardBrg);
+  const p2far = offsetCoord(p2, extendKm, outwardBrg);
+  return [[p1, p1far, p2far, p2, p1]];
+}
+
+function addRouteCutoffMasks() {
+  ROUTE_CUTOFFS.forEach(cut => {
+    const srcId = 'cutoff-' + cut.id;
+    if (map.getSource(srcId)) return;
+    map.addSource(srcId, {
+      type: 'geojson',
+      data: { type: 'Feature', geometry: { type: 'Polygon', coordinates: makeCutoffMaskPolygon(cut.coord) } }
+    });
+    map.addLayer({
+      id: 'cutoff-layer-' + cut.id, type: 'fill', source: srcId,
+      paint: { 'fill-color': '#0A0E13', 'fill-opacity': 0.97 }
+    });
+  });
+}
 /* ---------- Estado del viaje + orquestación de carga ---------- */
 let currentOrigin = LOCATIONS.find(l => l.name === 'Colliguay, Salamanca');
 let currentDestination = LOCATIONS.find(l => l.name === 'Plaza de Armas, Salamanca');
@@ -1680,6 +1767,7 @@ map.on('load', async () => {
   tintGreenLayers();
   boostDepthLayers();
   addAmbientCityGlow();
+  addRouteCutoffMasks();
   addPOIMarkers();
   await rebuildTrip(false);
   setTimeout(() => fitRouteView(ROUTE_LINE, true), 200);
