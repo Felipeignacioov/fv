@@ -621,7 +621,24 @@ const GEO = {
   chalinga:   [-70.9772, -31.7687]
 };
 
-const AREA_BOUNDS = [[-71.11, -31.86], [-70.93, -31.74]];
+/* Convierte un radio en km alrededor de un centro a una caja [[minLon,minLat],[maxLon,maxLat]]
+   (aproximación equirectangular, suficiente a esta escala/latitud). */
+function boundsFromRadius(center, radiusKm) {
+  const [lon, lat] = center;
+  const latRad = lat * Math.PI / 180;
+  const dLat = radiusKm / 111.32;
+  const dLon = radiusKm / (111.32 * Math.cos(latRad));
+  return [[lon - dLon, lat - dLat], [lon + dLon, lat + dLat]];
+}
+
+const RADIUS_KM = 15.3;
+/* Zona de datos real (Overpass/POI y geocodificación) — se queda exactamente
+   en el radio pedido, sin margen, para no cargar calles ni POI de más. */
+const AREA_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM);
+/* Zona de navegación del mapa (maxBounds): un 12% más ancha solo para que
+   el usuario tenga aire antes de topar con el borde — no se usa para
+   pedir datos, solo para el límite de paneo/zoom del mapa. */
+const MAP_NAV_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM * 1.12);
 
 const LOCATIONS = [
   { name: 'Plaza de Armas, Salamanca',                    coord: GEO.salamanca },
@@ -1063,7 +1080,7 @@ const map = new maplibregl.Map({
   zoom: 12.4,
   pitch: 42,
   bearing: -12,
-  maxBounds: AREA_BOUNDS,
+  maxBounds: MAP_NAV_BOUNDS,
   minZoom: 11.4,
   maxZoom: 17,
   attributionControl: false,
