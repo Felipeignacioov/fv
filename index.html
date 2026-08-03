@@ -950,6 +950,12 @@ btn.addEventListener('click', () => {
   }).setLngLat(coords).setDOMContent(container).addTo(map);
 }
 
+/* ---------- Jerarquía visual con ruta activa (solo opacidad; no toca
+   selección, tamaños por zoom, ni ninguna otra lógica existente) ---------- */
+let routeIsActive = false;
+let POI_ICON_OPACITY_BASE = null;
+let POI_TEXT_OPACITY_BASE = null;
+
 function addPOILayer(rawPois) {
   const data = poisToGeoJSON(declutterPOIs(rawPois));
 
@@ -990,11 +996,13 @@ function addPOILayer(rawPois) {
      nombre aparezca ya en zoom medio. */
   const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'];
   const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.75, 13, 0.88];
-  const textOpacityExpr = ['step', ['zoom'],
+ const textOpacityExpr = ['step', ['zoom'],
     0,
     13.5, ['match', ['get', 'category'], ESSENTIAL_POI, 1, 0],
     15.2, 1
   ];
+  POI_ICON_OPACITY_BASE = iconOpacityExpr;
+  POI_TEXT_OPACITY_BASE = textOpacityExpr;
 
   const textLayout = {
     'text-field': ['get', 'name'],
@@ -1067,6 +1075,23 @@ function addPOILayer(rawPois) {
     if (selectedPoiId === null) return;
     if (!map.getContainer().contains(e.target)) clearPoiSelection();
   });
+
+  /* Aplica el estado de énfasis vigente por si la ruta ya se calculó
+     antes de que esta capa terminara de crearse (carga inicial). */
+  setPOIRouteEmphasis(routeIsActive);
+}
+
+/* Atenúa (30–40%) los POI generales cuando hay una ruta activa, dejando
+   intactos origen, destino y la línea de ruta (viven en marcadores/capas
+   aparte). Solo multiplica las expresiones de opacidad ya existentes —
+   no toca zoom, tamaño, selección táctil ni ninguna otra propiedad.
+   Llamado con `false`, los POI recuperan su visibilidad normal. */
+const POI_DIM_FACTOR = 0.35;
+function setPOIRouteEmphasis(active) {
+  if (!map.getLayer('poi-layer') || !POI_ICON_OPACITY_BASE || !POI_TEXT_OPACITY_BASE) return;
+  const factor = active ? POI_DIM_FACTOR : 1;
+  map.setPaintProperty('poi-layer', 'icon-opacity', ['*', POI_ICON_OPACITY_BASE, factor]);
+  map.setPaintProperty('poi-layer', 'text-opacity', ['*', POI_TEXT_OPACITY_BASE, factor]);
 }
 
 async function addPOIMarkers() {
@@ -1854,6 +1879,8 @@ async function rebuildTrip(animate = true) {
   restartTravel();
   fitRouteView(ROUTE_LINE, animate);
   updateMiniRoute();
+  routeIsActive = true;
+  setPOIRouteEmphasis(routeIsActive);
 }
 
 map.on('load', async () => {
