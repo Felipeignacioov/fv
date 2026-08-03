@@ -1352,13 +1352,44 @@ function pointAtT(tt) {
   const [lon0, lat0] = ROUTE_LINE[i - 1], [lon1, lat1] = ROUTE_LINE[i];
   return [lon0 + (lon1 - lon0) * segT, lat0 + (lat1 - lat0) * segT];
 }
+/* Genera el degradado de la banda viajera centrada en `phase` (0 a 1,
+   posición a lo largo de la ruta). Fuera de la banda queda transparente
+   (se ve la línea base de abajo tal cual); dentro, un realce claro y
+   sutil con caída suave (cuadrática) en los bordes — nada de bordes
+   duros ni parpadeo. */
+function buildRouteFlowGradient(phase, bandWidth = 0.14) {
+  const steps = 12;
+  const stops = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    let d = Math.abs(t - phase);
+    d = Math.min(d, 1 - d); // continuidad en el loop (envuelve 1 -> 0)
+    const intensity = Math.max(0, 1 - d / bandWidth);
+    const alpha = (intensity * intensity * 0.55).toFixed(3);
+    stops.push(t, `rgba(226,255,244,${alpha})`);
+  }
+  return ['interpolate', ['linear'], ['line-progress'], ...stops];
+}
 
+const ROUTE_FLOW_LOOP_MS = 2600;
+function tickRouteFlow(now) {
+  if (map.getLayer('route-flow') && ROUTE_LINE.length > 1) {
+    const phase = (now % ROUTE_FLOW_LOOP_MS) / ROUTE_FLOW_LOOP_MS;
+    map.setPaintProperty('route-flow', 'line-gradient', buildRouteFlowGradient(phase));
+  }
+  requestAnimationFrame(tickRouteFlow);
+}
+requestAnimationFrame(tickRouteFlow);
+     
 function addRouteLayers() {
   if (map.getSource('route')) {
     map.getSource('route').setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE_LINE } });
     return;
   }
-  map.addSource('route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE_LINE } } });
+ /* lineMetrics:true habilita ['line-progress'] (0 a 1 a lo largo de la
+     ruta), que es lo que necesita line-gradient para animar el "traveling
+     highlight" de abajo. */
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: ROUTE_LINE } } });
 
   /* Efecto de doble capa: una base ancha y difuminada (halo verde esmeralda
      de baja intensidad) y una línea principal nítida encima. Así la ruta
@@ -1374,6 +1405,19 @@ function addRouteLayers() {
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
       'line-opacity': 0.97 } });
+
+  /* Traveling highlight tipo Uber: una banda clara y angosta que recorre
+     la ruta en loop, usando line-gradient sobre line-progress. Se anima
+     actualizando SOLO esta expresión (no geometría, no otras capas), que
+     es la forma nativa y liviana de MapLibre para este efecto — la GPU
+     interpola un degradado pequeño, no se re-tesela la línea en cada
+     frame, por eso se sostiene a 60 FPS sin lag. */
+  if (!map.getLayer('route-flow')) {
+    map.addLayer({ id: 'route-flow', type: 'line', source: 'route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
+        'line-gradient': buildRouteFlowGradient(0) } });
+  }
 
   let breatheT = 0;
   setInterval(() => {
