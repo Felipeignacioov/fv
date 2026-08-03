@@ -2197,6 +2197,24 @@ driverCardPill.addEventListener('click', () => {
   clearTimeout(driverCollapseTimer);
   driverCard.classList.remove('collapsed');
 });
+
+// Faltaba el camino de vuelta: tocar el encabezado de la tarjeta ya
+// expandida, o tocar fuera de ella, debe volver a colapsarla en la
+// píldora. No se toca .contact-row (Llamar/Mensaje) para no interferir
+// con esos botones.
+const driverCardStatusRow = driverCard.querySelector('.status');
+if (driverCardStatusRow) {
+  driverCardStatusRow.style.cursor = 'pointer';
+  driverCardStatusRow.addEventListener('click', () => {
+    if (!driverCard.classList.contains('collapsed')) driverCard.classList.add('collapsed');
+  });
+}
+document.addEventListener('click', (e) => {
+  if (!driverCard.classList.contains('assigned')) return;
+  if (driverCard.classList.contains('collapsed')) return;
+  if (driverCard.contains(e.target)) return;
+  driverCard.classList.add('collapsed');
+});
 </script>
 </body>
 </html>
