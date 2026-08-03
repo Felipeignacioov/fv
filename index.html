@@ -162,6 +162,15 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 @media (hover:hover) and (pointer:fine){
   .poi-popup-btn:hover{ background:linear-gradient(150deg, rgba(5,150,105,0.3), rgba(5,150,105,0.12)); }
 }
+.poi-popup-btn.disabled{
+  cursor:not-allowed; pointer-events:none; color:var(--text-tertiary);
+  border-color:var(--border-glass); background:rgba(255,255,255,0.03);
+}
+.poi-popup-btn.disabled svg{ opacity:.5; }
+.poi-popup-warning{
+  margin-top:7px; font-size:9.5px; line-height:1.35; color:var(--text-tertiary);
+  text-align:center; max-width:180px;
+}
 
 /* =====================================================================
    4) UI OVERLAY
@@ -970,16 +979,31 @@ function selectPOI(feature) {
   const btn = document.createElement('button');
   btn.className = 'poi-popup-btn';
   btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>Usar como destino</span>';
-btn.addEventListener('click', () => {
-    currentDestination = { name, coord: coords };
-    toText.value = name;
-    rebuildTrip();
-    clearPoiSelection();
-    if (window.innerWidth <= 880) setSheet('mid');
-  });
-  container.appendChild(nameEl);
-  container.appendChild(btn);
 
+  // Con un viaje activo (buscando conductor, recién asignado o en camino
+  // al punto de recogida) no se permite cambiar el destino: el POI se
+  // puede seguir consultando, pero el botón queda deshabilitado y se
+  // muestra un aviso. No se toca la ruta, la cámara ni el viaje en curso.
+  if (busy) {
+    btn.classList.add('disabled');
+    btn.disabled = true;
+    const warning = document.createElement('div');
+    warning.className = 'poi-popup-warning';
+    warning.textContent = 'Finaliza o cancela tu viaje actual para elegir otro destino';
+    container.appendChild(nameEl);
+    container.appendChild(btn);
+    container.appendChild(warning);
+  } else {
+    btn.addEventListener('click', () => {
+      currentDestination = { name, coord: coords };
+      toText.value = name;
+      rebuildTrip();
+      clearPoiSelection();
+      if (window.innerWidth <= 880) setSheet('mid');
+    });
+    container.appendChild(nameEl);
+    container.appendChild(btn);
+  }
   poiPopup = new maplibregl.Popup({
     closeButton: false, closeOnClick: false, offset: 24,
     className: 'poi-popup-wrap', maxWidth: '220px'
@@ -2001,9 +2025,13 @@ function setupAutocomplete(input, list, onSelect) {
 }
 
 setupAutocomplete(fromText, fromList, (loc) => { currentOrigin = loc; rebuildTrip(); });
-setupAutocomplete(toText, toList, (loc) => { currentDestination = loc; rebuildTrip(); });
+setupAutocomplete(toText, toList, (loc) => {
+  if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); toText.value = currentDestination.name; return; }
+  currentDestination = loc; rebuildTrip();
+});
 
 swapBtn.addEventListener('click', () => {
+  if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); return; }
   [currentOrigin, currentDestination] = [currentDestination, currentOrigin];
   fromText.value = currentOrigin.name;
   toText.value = currentDestination.name;
