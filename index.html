@@ -934,10 +934,16 @@ function selectPOI(feature) {
   const btn = document.createElement('button');
   btn.className = 'poi-popup-btn';
   btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>Usar como destino</span>';
-  btn.addEventListener('click', () => {
+ btn.addEventListener('click', () => {
     currentDestination = { name, coord: coords };
     toText.value = name;
-    rebuildTrip();
+    /* rebuildTrip(false): construye la ruta sin el encuadre genérico de
+       siempre (fitRouteView, 1700ms) — en su lugar, una vez que la ruta
+       está lista, se usa un encuadre dedicado más corto y con una curva
+       ease-in-out (en vez de solo ease-out), pensado específicamente
+       para esta acción de "elegir destino". Mismo padding y mismo
+       maxZoom que el encuadre normal, así el zoom final no cambia. */
+    rebuildTrip(false).then(() => flyToOriginDestination(ROUTE_LINE));
     clearPoiSelection();
     if (window.innerWidth <= 880) setSheet('mid');
   });
@@ -1456,7 +1462,28 @@ function restartTravel() {
    aceleraciones/frenados bruscos al seguir la ruta, tanto en el encuadre
    automático como en cualquier zoom posterior. */
 function cameraEasing(t) { return 1 - Math.pow(1 - t, 3); }
-
+/* Encuadre "premium" dedicado a la acción de elegir destino desde un POI:
+   duración corta (900ms, dentro del rango 800-1000ms pedido) y una curva
+   ease-in-out (arranca y termina suave, con más "peso" en el medio) en
+   vez de la ease-out que usa el encuadre genérico. Mismo padding y mismo
+   maxZoom que fitRouteView, así el resultado final (qué tanto se ve de
+   la ruta y a qué zoom) es idéntico — solo cambia cómo se siente el
+   viaje de la cámara hasta llegar ahí. */
+function flyToOriginDestination(line, durationMs = 900) {
+  if (!line || !line.length) return;
+  const bounds = line.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(line[0], line[0]));
+  const isNarrow = window.innerWidth < 880;
+  const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  map.fitBounds(bounds, {
+    padding: isNarrow
+      ? { top: 70, bottom: 260, left: 24, right: 24 }
+      : { top: 90, bottom: 100, left: 320, right: 260 },
+    maxZoom: 15.3,
+    duration: durationMs,
+    easing: easeInOutCubic,
+    essential: true
+  });
+}
 function fitRouteView(line, animate = true) {
   if (!line || !line.length) return;
   const bounds = line.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(line[0], line[0]));
