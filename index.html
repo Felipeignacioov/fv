@@ -281,15 +281,21 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 .request-btn.done{ background:linear-gradient(150deg,#123B34,#0D2A26); color:#CFF7F1; border-color:rgba(16,185,129,0.3); box-shadow:0 6px 16px rgba(0,0,0,0.3); }
 .request-btn.done .request-btn-icon{ display:none; }
 .request-btn-car{ position:relative; display:none; align-items:center; justify-content:center; width:24px; height:24px; flex-shrink:0; }
-.request-btn-car svg{ width:100%; height:100%; display:block; position:relative; z-index:2; }
+.request-btn-car svg{ width:100%; height:100%; display:block; position:relative; z-index:2; animation: btnCarFloat 2.8s ease-in-out infinite; will-change: transform; }
+.request-btn-car .car-trail-line{ animation: btnTrailFlow 1.4s ease-in-out infinite; will-change: opacity; }
+.request-btn-car .car-trail-line:nth-child(1){ animation-delay: 0s; }
+.request-btn-car .car-trail-line:nth-child(2){ animation-delay: .16s; }
+.request-btn-car .car-trail-line:nth-child(3){ animation-delay: .32s; }
 .request-btn-car::before{
-  content:''; position:absolute; left:50%; top:50%; width:42px; height:42px; margin:-21px 0 0 -21px;
+  content:''; position:absolute; left:50%; top:50%; width:44px; height:44px; margin:-22px 0 0 -22px;
   border-radius:50%; z-index:1; pointer-events:none;
-  background: radial-gradient(circle, rgba(110,231,183,0.42) 0%, rgba(16,185,129,0.16) 55%, rgba(16,185,129,0) 72%);
-  animation: btnCarGlow 2.4s ease-in-out infinite;
+  background: radial-gradient(circle, rgba(110,231,183,0.38) 0%, rgba(16,185,129,0.14) 55%, rgba(16,185,129,0) 72%);
+  animation: btnCarGlow 3.4s cubic-bezier(.45,0,.55,1) infinite;
   will-change: opacity, transform;
 }
-@keyframes btnCarGlow{ 0%,100%{ opacity:.32; transform:scale(.8); } 50%{ opacity:1; transform:scale(1.1); } }
+@keyframes btnCarGlow{ 0%,100%{ opacity:.42; transform:scale(.92); } 50%{ opacity:1; transform:scale(1.05); } }
+@keyframes btnCarFloat{ 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-1px); } }
+@keyframes btnTrailFlow{ 0%,100%{ opacity:.15; } 50%{ opacity:.7; } }
 .request-btn.enroute{
   background: linear-gradient(150deg,#101820,#0A0F13); color:var(--accent-2);
   border-color: rgba(16,185,129,0.22); cursor:not-allowed; pointer-events:none;
@@ -593,10 +599,10 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
   <svg class="request-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
   <span class="request-btn-car" id="requestBtnCar" aria-hidden="true">
     <svg viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <g opacity="0.55" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
-        <line x1="1" y1="7" x2="7" y2="7"/>
-        <line x1="0" y1="10.5" x2="5" y2="10.5"/>
-        <line x1="1.5" y1="14" x2="6.5" y2="14"/>
+      <g stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <line class="car-trail-line" x1="1" y1="7" x2="7" y2="7"/>
+        <line class="car-trail-line" x1="0" y1="10.5" x2="5" y2="10.5"/>
+        <line class="car-trail-line" x1="1.5" y1="14" x2="6.5" y2="14"/>
       </g>
       <path d="M10 13.4v-2.1c0-.4.2-.8.5-1l1.6-1.2.8-2A1.6 1.6 0 0 1 14.4 6h6.2a1.6 1.6 0 0 1 1.5 1.1l.8 2 1.6 1.2c.3.2.5.6.5 1v2.1a.8.8 0 0 1-.8.8h-.7a.8.8 0 0 1-.8-.8v-.6H12.3v.6a.8.8 0 0 1-.8.8h-.7a.8.8 0 0 1-.8-.8z" fill="currentColor"/>
       <circle cx="13.6" cy="14.4" r="1.35" fill="#0A0E13" stroke="currentColor" stroke-width="1"/>
@@ -2033,7 +2039,9 @@ const SEARCH_MESSAGES = [
   'Conectando con un conductor disponible…'
 ];
 let busy = false;
-const PICKUP_ETA_MS = 7000; // duración simulada del trayecto del conductor hacia el punto de recogida
+const PICKUP_ETA_MS = 45000; // TODO: por ahora es un valor fijo largo para pruebas; luego debe reemplazarse
+                              // por la detección real de llegada del auto al origen (cuando la posición del
+                              // vehículo en la ruta coincida con el punto de recogida del pasajero)
 
 function startRequestFlow() {
   if (busy) return; busy = true;
