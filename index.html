@@ -280,6 +280,24 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 .request-btn.loading .request-btn-icon{ display:none; }
 .request-btn.done{ background:linear-gradient(150deg,#123B34,#0D2A26); color:#CFF7F1; border-color:rgba(16,185,129,0.3); box-shadow:0 6px 16px rgba(0,0,0,0.3); }
 .request-btn.done .request-btn-icon{ display:none; }
+.request-btn-car{ position:relative; display:none; align-items:center; justify-content:center; width:24px; height:24px; flex-shrink:0; }
+.request-btn-car svg{ width:100%; height:100%; display:block; position:relative; z-index:2; }
+.request-btn-car::before{
+  content:''; position:absolute; left:50%; top:50%; width:42px; height:42px; margin:-21px 0 0 -21px;
+  border-radius:50%; z-index:1; pointer-events:none;
+  background: radial-gradient(circle, rgba(110,231,183,0.42) 0%, rgba(16,185,129,0.16) 55%, rgba(16,185,129,0) 72%);
+  animation: btnCarGlow 2.4s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+@keyframes btnCarGlow{ 0%,100%{ opacity:.32; transform:scale(.8); } 50%{ opacity:1; transform:scale(1.1); } }
+.request-btn.enroute{
+  background: linear-gradient(150deg,#101820,#0A0F13); color:var(--accent-2);
+  border-color: rgba(16,185,129,0.22); cursor:not-allowed; pointer-events:none;
+  box-shadow:0 6px 16px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+.request-btn.enroute .request-btn-icon,
+.request-btn.enroute .request-btn-label{ display:none; }
+.request-btn.enroute .request-btn-car{ display:flex; }
 .footnote{ margin-top:8px; font-size:9.5px; color:var(--text-tertiary); text-align:center; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease; }
 .sheet-handle{ display:none; }
 .rc-mini-route{ display:none; }
@@ -571,9 +589,21 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
         <div class="estimate-card"><div class="elabel">Tiempo</div><div class="evalue mono" id="etaText">25 min</div></div>
         <div class="estimate-card price"><div class="elabel">Precio</div><div class="evalue mono" id="priceText">$4.500</div></div>
       </div>
-      <button class="request-btn" id="requestBtn">
+     <button class="request-btn" id="requestBtn">
   <svg class="request-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <span id="requestBtnLabel">Pedir viaje</span>
+  <span class="request-btn-car" id="requestBtnCar" aria-hidden="true">
+    <svg viewBox="0 0 32 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g opacity="0.55" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <line x1="1" y1="7" x2="7" y2="7"/>
+        <line x1="0" y1="10.5" x2="5" y2="10.5"/>
+        <line x1="1.5" y1="14" x2="6.5" y2="14"/>
+      </g>
+      <path d="M10 13.4v-2.1c0-.4.2-.8.5-1l1.6-1.2.8-2A1.6 1.6 0 0 1 14.4 6h6.2a1.6 1.6 0 0 1 1.5 1.1l.8 2 1.6 1.2c.3.2.5.6.5 1v2.1a.8.8 0 0 1-.8.8h-.7a.8.8 0 0 1-.8-.8v-.6H12.3v.6a.8.8 0 0 1-.8.8h-.7a.8.8 0 0 1-.8-.8z" fill="currentColor"/>
+      <circle cx="13.6" cy="14.4" r="1.35" fill="#0A0E13" stroke="currentColor" stroke-width="1"/>
+      <circle cx="20.6" cy="14.4" r="1.35" fill="#0A0E13" stroke="currentColor" stroke-width="1"/>
+    </svg>
+  </span>
+  <span class="request-btn-label" id="requestBtnLabel">Pedir viaje</span>
 </button>
       <div class="footnote">Incluye recargo por zona rural</div>
     </div>
@@ -1992,6 +2022,7 @@ document.querySelectorAll('.service-opt').forEach(opt => {
 
 /* ---------- I. FLUJO DE ESTADOS: idle -> buscando conductor -> asignado ---------- */
 const requestBtn = document.getElementById('requestBtn');
+const requestBtnLabel = document.getElementById('requestBtnLabel');
 const driverCard = document.getElementById('driverCard');
 const searchingOverlay = document.getElementById('searchingOverlay');
 const searchingText = document.getElementById('searchingText');
@@ -2002,12 +2033,14 @@ const SEARCH_MESSAGES = [
   'Conectando con un conductor disponible…'
 ];
 let busy = false;
+const PICKUP_ETA_MS = 7000; // duración simulada del trayecto del conductor hacia el punto de recogida
 
 function startRequestFlow() {
   if (busy) return; busy = true;
   driverCard.classList.remove('visible', 'assigned');
   carEl.classList.remove('visible');
-  requestBtn.classList.add('loading'); document.getElementById('requestBtnLabel').textContent = 'Buscando conductor…';
+  requestBtn.classList.remove('enroute');
+  requestBtn.classList.add('loading'); requestBtnLabel.textContent = 'Buscando conductor…';
   setSheet('collapsed'); // deja ver el mapa casi por completo mientras busca
 
   let msgIdx = 0;
@@ -2023,13 +2056,27 @@ function startRequestFlow() {
     clearInterval(msgTimer);
     searchingOverlay.classList.remove('show');
     requestBtn.classList.remove('loading'); requestBtn.classList.add('done');
-document.getElementById('requestBtnLabel').textContent = '¡Conductor asignado!';
+    requestBtnLabel.textContent = '¡Conductor asignado!';
     driverCard.classList.add('visible', 'assigned');
     restartTravel();
     carEl.classList.add('visible');
     setSheet('mid');
     map.easeTo({ zoom: Math.min(17, map.getZoom() + 0.55), duration: 1300, easing: cameraEasing, essential: true });
-    setTimeout(() => { requestBtn.classList.remove('done'); document.getElementById('requestBtnLabel').textContent = 'Pedir viaje'; busy = false; }, 2600);
+
+    // El conductor va camino al punto de recogida: el botón se bloquea por
+    // completo y muestra el ícono animado de auto en movimiento hasta que
+    // "llega" — recién ahí vuelve automáticamente al estado siguiente.
+    setTimeout(() => {
+      requestBtn.classList.remove('done');
+      requestBtn.classList.add('enroute');
+      requestBtnLabel.textContent = 'Conductor en camino…';
+
+      setTimeout(() => {
+        requestBtn.classList.remove('enroute');
+        requestBtnLabel.textContent = 'Pedir viaje';
+        busy = false;
+      }, PICKUP_ETA_MS);
+    }, 1300);
   }, waitTime);
 }
 requestBtn.addEventListener('click', startRequestFlow);
