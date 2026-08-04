@@ -398,7 +398,21 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
   .contact-btn:hover{ color:var(--text-primary); border-color:rgba(5,150,105,.3); }
 }
 .contact-btn svg{ width:11px; height:11px; }
-
+.cancel-link{
+  margin-top:12px; width:100%; padding:9px; border-radius:10px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.08); background:transparent;
+  color:var(--text-tertiary); font-size:11px; font-weight:600; font-family:inherit;
+  transition: color .2s ease, border-color .2s ease, background .2s ease, transform .12s ease;
+}
+/* El de la searching-card (dentro del overlay de búsqueda) siempre está
+   visible mientras el overlay está abierto — solo el de la driver-card
+   necesita ocultarse/mostrarse según el estado del viaje. */
+#cancelTripBtn{ max-height:0; opacity:0; margin-top:0; padding:0; border:none; overflow:hidden; pointer-events:none; }
+#cancelTripBtn.visible{ max-height:40px; opacity:1; margin-top:12px; padding:9px; border:1px solid rgba(255,255,255,0.08); pointer-events:auto; }
+.cancel-link:active{ transform:scale(.97); color:#ffb3ab; border-color:rgba(255,90,80,0.28); background:rgba(255,90,80,0.06); }
+@media (hover:hover) and (pointer:fine){
+  .cancel-link:hover{ color:#ffb3ab; border-color:rgba(255,90,80,0.24); background:rgba(255,90,80,0.05); }
+}
 .status-strip{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:15; display:flex; background:var(--glass-fill); border:1px solid var(--border-glass); border-radius:14px; backdrop-filter: blur(22px) saturate(160%); box-shadow:0 10px 28px rgba(0,0,0,0.35); animation: chromeEnter .8s .3s cubic-bezier(.16,1,.3,1) both; overflow:hidden; }
 .strip-item{ display:flex; align-items:center; gap:8px; padding:9px 15px; }
 .strip-div{ width:1px; background:var(--border-glass); }
@@ -583,6 +597,7 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
     <div class="radar"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core"></div></div>
     <div class="searching-text" id="searchingText">Buscando el mejor conductor…</div>
     <div class="searching-sub">Esto toma solo unos segundos</div>
+    <button class="cancel-link" id="cancelSearchBtn">Cancelar búsqueda</button>
   </div>
 </div>
 
@@ -681,6 +696,7 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
         <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.5 2.1L8 9.7a16 16 0 0 0 6.3 6.3l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.7 2z" stroke-linejoin="round"/></svg>Llamar</div>
         <div class="contact-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linejoin="round"/></svg>Mensaje</div>
       </div>
+      <button class="cancel-link" id="cancelTripBtn">Cancelar viaje</button>
     </div>
   </div>
 
@@ -2298,6 +2314,13 @@ let driverCollapseTimer = null;
 const PICKUP_ETA_MS = 45000; // TODO: por ahora es un valor fijo largo para pruebas; luego debe reemplazarse
                               // por la detección real de llegada del auto al origen (cuando la posición del
                               // vehículo en la ruta coincida con el punto de recogida del pasajero)
+const cancelSearchBtn = document.getElementById('cancelSearchBtn');
+const cancelTripBtn = document.getElementById('cancelTripBtn');
+// Identificadores de todos los temporizadores del flujo, guardados para
+// poder frenarlos de golpe si el usuario cancela a mitad de camino —
+// sin esto, el flujo seguiría "avanzando" solo por detrás aunque ya
+// hubiera cancelado.
+let tripTimers = { msgTimer: null, searchTimeout: null, assignedTimeout: null, enrouteTimeout: null };
 
 function startRequestFlow() {
   if (busy) return; busy = true;
@@ -2311,14 +2334,14 @@ function startRequestFlow() {
   let msgIdx = 0;
   searchingText.textContent = SEARCH_MESSAGES[0];
   searchingOverlay.classList.add('show');
-  const msgTimer = setInterval(() => {
+  tripTimers.msgTimer = setInterval(() => {
     msgIdx = (msgIdx + 1) % SEARCH_MESSAGES.length;
     searchingText.textContent = SEARCH_MESSAGES[msgIdx];
   }, 1150);
 
   const waitTime = 2500 + Math.random() * 1500;
-  setTimeout(() => {
-    clearInterval(msgTimer);
+  tripTimers.searchTimeout = setTimeout(() => {
+    clearInterval(tripTimers.msgTimer);
     searchingOverlay.classList.remove('show');
     requestBtn.classList.remove('loading'); requestBtn.classList.add('done');
     requestBtnLabel.textContent = '¡Conductor asignado!';
@@ -2336,20 +2359,54 @@ function startRequestFlow() {
     // El conductor va camino al punto de recogida: el botón se bloquea por
     // completo y muestra el ícono animado de auto en movimiento hasta que
     // "llega" — recién ahí vuelve automáticamente al estado siguiente.
-    setTimeout(() => {
+    tripTimers.assignedTimeout = setTimeout(() => {
       requestBtn.classList.remove('done');
       requestBtn.classList.add('enroute');
       requestBtnLabel.textContent = 'Conductor en camino…';
 
-      setTimeout(() => {
+      tripTimers.enrouteTimeout = setTimeout(() => {
         requestBtn.classList.remove('enroute');
         requestBtnLabel.textContent = 'Pedir viaje';
+        cancelTripBtn.classList.remove('visible');
         busy = false;
       }, PICKUP_ETA_MS);
     }, 1300);
   }, waitTime);
+
+  // El link de cancelar viaje (en la driver-card) queda listo desde ya —
+  // solo se ve una vez que la tarjeta esté visible (assigned/enroute),
+  // ya que vive dentro de driver-card-full.
+  cancelTripBtn.classList.add('visible');
 }
 requestBtn.addEventListener('click', startRequestFlow);
+
+/* Cancela el viaje en cualquier punto del flujo (buscando, recién
+   asignado o en camino): frena todos los temporizadores pendientes y
+   devuelve la app exactamente al estado inicial (botón "Pedir viaje",
+   sin tarjeta de conductor, auto detenido en el origen). No toca nada
+   de la ruta, el mapa ni el destino elegido — el usuario puede pedir de
+   nuevo de inmediato. */
+function cancelTrip() {
+  if (!busy) return;
+  clearInterval(tripTimers.msgTimer);
+  clearTimeout(tripTimers.searchTimeout);
+  clearTimeout(tripTimers.assignedTimeout);
+  clearTimeout(tripTimers.enrouteTimeout);
+  clearTimeout(driverCollapseTimer);
+
+  searchingOverlay.classList.remove('show');
+  requestBtn.classList.remove('loading', 'done', 'enroute');
+  requestBtnLabel.textContent = 'Pedir viaje';
+  driverCard.classList.remove('visible', 'assigned', 'collapsed');
+  cancelTripBtn.classList.remove('visible');
+  carEl.classList.remove('visible');
+  stopTravel();
+
+  busy = false;
+  showToast('Viaje cancelado');
+}
+cancelSearchBtn.addEventListener('click', (e) => { e.stopPropagation(); cancelTrip(); });
+cancelTripBtn.addEventListener('click', (e) => { e.stopPropagation(); cancelTrip(); });
 
 /* ---------- J. BOTTOM SHEET DE 3 ESTADOS (solo móvil) ----------
    La mecánica de expansión (3 estados, gestos de arrastre, umbrales) se
