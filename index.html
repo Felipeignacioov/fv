@@ -738,9 +738,16 @@ function restrictBaseLayersToOperationalZone() {
        ambiental) — esto es solo para el estilo base del mapa. */
     if (layer.id.startsWith('poi-') || layer.id.startsWith('route-') ||
         layer.id.startsWith('cutoff-') || layer.id.startsWith('city-glow')) return;
-    /* Solo líneas (calles) y símbolos (nombres/etiquetas) — no tocar
-       rellenos (agua, terreno, edificios) para no dejar huecos visuales. */
-    if (layer.type !== 'line' && layer.type !== 'symbol') return;
+    /* Solo símbolos (nombres/etiquetas): 'within' evalúa un único punto
+       por etiqueta, así que es exacto. Las calles quedan FUERA de este
+       filtro a propósito: 'within' solo conserva una línea si TODA su
+       geometría cae dentro del polígono, así que cualquier calle real
+       que se extienda apenas más allá del límite (como pasaba con las de
+       Tahuinco) desaparecía completa, incluido el tramo que sí estaba
+       dentro de la zona. El cálculo de colisión de texto es, de las dos
+       cosas, la parte cara para el FPS — así que casi toda la ganancia
+       de rendimiento se mantiene igual. */
+    if (layer.type !== 'symbol') return;
     try {
       const newFilter = layer.filter ? ['all', layer.filter, withinExpr] : withinExpr;
       map.setFilter(layer.id, newFilter);
