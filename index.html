@@ -1368,24 +1368,25 @@ function pointAtT(tt) {
 function buildRouteFlowGradient(phase, bandWidth = 0.1) {
   const steps = 16;
   const stops = [];
-  const wrapDelta = (a, b) => {
-    let d = a - b;
-    d = ((d + 0.5) % 1 + 1) % 1 - 0.5; // distancia con signo, con wrap del loop
-    return d;
-  };
+  /* Curva suave (smoothstep) en vez de la caída cuadrática anterior: los
+     bordes de la banda crecen y se apagan de forma más gradual, sin el
+     aspecto "de cartón" de antes — mismo costo de cálculo, solo cambia
+     la fórmula de la intensidad. */
+  const smoothstep = (x) => { const c = Math.max(0, Math.min(1, x)); return c * c * (3 - 2 * c); };
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    const delta = wrapDelta(t, phase); // negativo = antes del frente, positivo = después
+    // Sin "wrap": la ruta se recorre UNA sola vez, de origen (t=0) a
+    // destino (t=1) — nunca hay dos frentes visibles a la vez en el
+    // mismo trayecto.
+    const delta = t - phase;
 
-    // Zona oscura/opaca justo detrás del frente (antes de que pase la luz)
     const darkD = Math.max(0, -delta) / (bandWidth * 1.6);
-    const darkIntensity = Math.max(0, 1 - darkD);
-    const darkAlpha = darkIntensity * darkIntensity * 0.5; // hacia el color de fondo del mapa
+    const darkIntensity = smoothstep(1 - darkD);
+    const darkAlpha = darkIntensity * 0.5;
 
-    // Frente claro, más marcado que antes
     const lightD = Math.abs(delta) / bandWidth;
-    const lightIntensity = Math.max(0, 1 - lightD);
-    const lightAlpha = lightIntensity * lightIntensity * 0.85;
+    const lightIntensity = smoothstep(1 - lightD);
+    const lightAlpha = lightIntensity * 0.85;
 
     let r, g, b, a;
     if (darkAlpha > lightAlpha) {
@@ -1398,14 +1399,21 @@ function buildRouteFlowGradient(phase, bandWidth = 0.1) {
   return ['interpolate', ['linear'], ['line-progress'], ...stops];
 }
 
-const ROUTE_FLOW_LOOP_MS = 2600;
+const ROUTE_FLOW_LOOP_MS = 2808; // 2600ms + 8%
+const ROUTE_FLOW_PAUSE_MS = 500; // pausa al llegar al destino antes de reiniciar
+const ROUTE_FLOW_CYCLE_MS = ROUTE_FLOW_LOOP_MS + ROUTE_FLOW_PAUSE_MS;
+
 function tickRouteFlow(now) {
   if (map.getLayer('route-flow') && ROUTE_LINE.length > 1) {
-    const phase = (now % ROUTE_FLOW_LOOP_MS) / ROUTE_FLOW_LOOP_MS;
+    const cycleT = now % ROUTE_FLOW_CYCLE_MS;
+    // Recorre 0 -> 1 en ROUTE_FLOW_LOOP_MS; el resto del ciclo (500ms) se
+    // queda fija en 1 (destino) antes de que el módulo la reinicie sola.
+    const phase = cycleT < ROUTE_FLOW_LOOP_MS ? cycleT / ROUTE_FLOW_LOOP_MS : 1;
     map.setPaintProperty('route-flow', 'line-gradient', buildRouteFlowGradient(phase));
   }
   requestAnimationFrame(tickRouteFlow);
 }
+requestAnimationFrame(tickRouteFlow);
 requestAnimationFrame(tickRouteFlow);
      
 function addRouteLayers() {
