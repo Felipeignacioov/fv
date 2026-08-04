@@ -833,7 +833,11 @@ const POI_ICONS = {
   /* Localidades/sectores rurales (place=hamlet|village|town|locality en
      OSM) — mismo glifo de pin que ya usa el botón "Usar como destino"
      del popup, para no introducir un ícono nuevo ajeno al resto de la app. */
-  locality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4"/></svg>'
+  locality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4"/></svg>',
+  /* Sede vecinal / junta de vecinos (amenity=community_centre en OSM). */
+  community: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v10h14V10" stroke-linejoin="round"/><path d="M9 20v-6h6v6" stroke-linejoin="round"/></svg>',
+  /* Estación de servicio (amenity=fuel en OSM). */
+  fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15" stroke-linejoin="round"/><path d="M4 21h10M14 9h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V8l-2-2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6h4" stroke-linecap="round"/></svg>'
 };
 
 /* Respaldo mínimo (solo entra en juego si Overpass no responde). Se
@@ -866,13 +870,10 @@ const POI_PLACES = [
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
 /* Las categorías relevantes para un viaje en la zona: hospital, farmacia,
-   municipalidad, terminal, banco, bomberos, supermercado, plaza y ahora
-   también localidades/sectores rurales (place=hamlet|village|town|
-   locality) — para que Chuchiñí, El Tambo, El Boldo, Villa El Faro,
-   Colliguay, El Queñe y demás sectores del radio de servicio aparezcan
-   como referencia geográfica real, tal cual los tiene catalogados OSM.
-   Todo lo demás (iglesias sin verificar, cafés, comida, bencineras,
-   deporte, turismo) queda fuera para no saturar el mapa. */
+   municipalidad, terminal, banco, bomberos, supermercado, plaza,
+   localidades/sectores rurales, escuelas, iglesias (postas de salud
+   real), sedes vecinales y estaciones de servicio. Todo lo demás (cafés,
+   comida, deporte, turismo) queda fuera para no saturar el mapa. */
 function classifyOSMTags(tags) {
   if (!tags) return null;
   if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return 'health';
@@ -881,6 +882,10 @@ function classifyOSMTags(tags) {
   if (tags.amenity === 'bus_station') return 'transport';
   if (tags.amenity === 'bank') return 'bank';
   if (tags.amenity === 'fire_station') return 'firestation';
+  if (tags.amenity === 'school') return 'school';
+  if (tags.amenity === 'place_of_worship') return 'church';
+  if (tags.amenity === 'community_centre') return 'community';
+  if (tags.amenity === 'fuel') return 'fuel';
  if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
   if (tags.leisure === 'square' || tags.place === 'square') return 'landmark';
   // Localidades/sectores rurales reales de OSM (no coordenadas escritas a
@@ -891,12 +896,28 @@ function classifyOSMTags(tags) {
   return null;
 }
 
+/* ---------- Jerarquía geográfica urbano/rural ----------
+   Salamanca (el centro) mantiene TODA la densidad de POI de siempre
+   (hospital, bancos, farmacias, supermercados, terminal, municipalidad,
+   etc.). Fuera de ese radio —el resto del área de servicio, donde caen
+   las localidades rurales— solo se muestran las categorías que
+   realmente existen y son relevantes ahí: salud (postas), escuelas,
+   iglesias, plazas, sedes vecinales, estaciones de servicio, minimarkets
+   y las localidades mismas. No es una restricción de zoom: un banco o
+   una farmacia rural, si existieran, no se descartan por esto — la lista
+   de abajo es justamente "lo que sí tiene sentido buscar en el campo",
+   nunca "lo urbano recortado". */
+const URBAN_CORE_RADIUS_KM = 3;
+const RURAL_ALLOWED_CATEGORIES = new Set([
+  'health', 'school', 'church', 'landmark', 'locality', 'community', 'fuel', 'market'
+]);
+
 async function fetchOSMPOIs() {
   const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
   const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
   const query = `[out:json][timeout:25];(
-node["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
-way["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
+node["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station|school|place_of_worship|community_centre|fuel)$"](${bbox});
+way["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station|school|place_of_worship|community_centre|fuel)$"](${bbox});
 node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
 way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
 node["leisure"="square"](${bbox});
@@ -923,6 +944,11 @@ out center tags;`;
     const lat = el.lat !== undefined ? el.lat : (el.center && el.center.lat);
     const lon = el.lon !== undefined ? el.lon : (el.center && el.center.lon);
     if (lat === undefined || lon === undefined) return;
+    // Fuera del centro de Salamanca, solo entran las categorías
+    // realmente relevantes en zona rural (ver RURAL_ALLOWED_CATEGORIES).
+    // Dentro del radio urbano no se filtra nada, para no perder densidad.
+    const distKm = haversineMeters(GEO.salamanca, [lon, lat]) / 1000;
+    if (distKm > URBAN_CORE_RADIUS_KM && !RURAL_ALLOWED_CATEGORIES.has(category)) return;
     const key = normalize(tags.name) + '|' + lat.toFixed(4) + ',' + lon.toFixed(4);
     if (seen.has(key)) return;
     seen.add(key);
@@ -954,7 +980,7 @@ const POI_CATEGORY_PRIORITY = {
   // que un banco o un supermercado.
   locality:-1,
   health:0, pharmacy:1, firestation:2, government:3, bank:4,
-  transport:5, market:6, landmark:7, church:8, school:9
+  transport:5, market:6, landmark:7, church:8, school:9, community:9, fuel:6
 };
 
 // Tope subido de 20 a 45: antes cubría en la práctica solo el centro de
@@ -1162,7 +1188,7 @@ function addPOILayer(rawPois) {
      interpolate completos, se usa UN solo interpolate de zoom y, en cada
      parada, un "match" que decide el tamaño según la categoría. */
   const isEssentialSize = ['match', ['get', 'category'],
-    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality'], true, false
+    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel'], true, false
   ];
   const sizeExpr = ['interpolate', ['linear'], ['zoom'],
     11, ['case', isEssentialSize, 0.46, 0.36],
@@ -1188,7 +1214,7 @@ function addPOILayer(rawPois) {
      referentes en localidades rurales (El Tambo, Tahuinco) — ahí no hay
      "ruido" de otros POI con los que compitan, así que conviene que su
      nombre aparezca ya en zoom medio. */
-  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality'];
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel'];
   const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'],
     11,   ['case', isEssentialSize, 0.75, 0],
     12.8, ['case', isEssentialSize, 0.8,  0],
