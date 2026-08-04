@@ -73,7 +73,16 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
   position:fixed; inset:0; z-index:2; pointer-events:none; opacity:0.035; mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-
+/* Perspectiva atmosférica: la franja superior de la pantalla (donde, con
+   el mapa inclinado, se ve el terreno más "lejano") se difumina hacia un
+   tono cálido muy sutil — el mismo recurso que usan los mapas 3D de
+   referencia para reforzar la sensación de profundidad real, no solo una
+   textura plana inclinada. Gradiente estático, sin animación, sin costo
+   de rendimiento. */
+.map-atmosphere{
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background: linear-gradient(180deg, rgba(232,196,140,0.055) 0%, rgba(232,196,140,0.02) 13%, rgba(232,196,140,0) 26%);
+}
 .maplibregl-ctrl-group{
   background: var(--glass-fill) !important;
   border:1px solid var(--border-glass) !important;
@@ -561,6 +570,7 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
 <div class="map-grade"></div>
 <div class="map-vignette"></div>
 <div class="map-grain"></div>
+<div class="map-atmosphere"></div>
 <div class="sheet-scrim"></div>
 <div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
 <div class="map-loading" id="mapLoading">
@@ -2114,6 +2124,48 @@ async function rebuildTrip(animate = true) {
   setPOIRouteEmphasis(routeIsActive);
 }
 
+/* ---------- Salto visual premium: edificios 3D + luz direccional ----------
+   Con el mapa ya inclinado (pitch 42°), darle volumen real a los edificios
+   (en vez de solo su huella plana) es lo que más diferencia un mapa
+   "normal" de uno tipo Uber/Apple Maps. Se usa la misma fuente y capa de
+   edificios que ya trae el estilo base — el esquema OpenMapTiles incluye
+   render_height/render_min_height (en metros) en la capa de edificios
+   justo para esto, así que no se agrega ninguna fuente de datos nueva.
+   Solo se activa en equipos que no son gama baja (isLowEndDevice, ya
+   definido para el mapa) y a partir de zoom 15, para no tocar el
+   presupuesto de rendimiento que ya optimizamos para gama media/baja. */
+function add3DBuildings() {
+  if (isLowEndDevice) return;
+  const styleLayers = map.getStyle().layers || [];
+  const buildingFill = styleLayers.find(l => l.type === 'fill' && isBuildingLayer(l.id.toLowerCase()));
+  if (!buildingFill || map.getLayer('buildings-3d')) return;
+  const spec = {
+    id: 'buildings-3d', type: 'fill-extrusion', source: buildingFill.source, minzoom: 15,
+    paint: {
+      'fill-extrusion-color': '#1B242C',
+      'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 6],
+      'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+      'fill-extrusion-opacity': ['interpolate', ['linear'], ['zoom'], 15, 0, 15.5, 0.82]
+    }
+  };
+  if (buildingFill['source-layer']) spec['source-layer'] = buildingFill['source-layer'];
+  if (buildingFill.filter) spec.filter = buildingFill.filter;
+  try { map.addLayer(spec, buildingFill.id); } catch (e) { /* si la fuente no soporta extrusión, se omite sin romper el mapa */ }
+}
+
+/* Luz direccional cálida (mismo tono #E8C48C que el resplandor ambiental
+   ya existente, para que se sientan parte de la misma iluminación) — sin
+   esto los edificios 3D se ven planos aunque tengan volumen; con la luz,
+   cada cara del edificio se sombrea distinto según su orientación, que
+   es la señal visual real de "esto es 3D". Es la API nativa de MapLibre
+   para esto (map.setLight), no afecta ninguna otra capa (rutas, POI,
+   círculos de resplandor no reaccionan a esta luz). */
+function setPremiumLighting() {
+  try {
+    map.setLight({ anchor: 'viewport', color: '#E8C48C', intensity: 0.28, position: [1.2, 210, 42] });
+  } catch (e) { /* estilo sin soporte de light, se omite sin romper el mapa */ }
+}
+
 map.on('load', async () => {
   boostStyleVisibility();
   hidePlaceNamesByBlacklist();
@@ -2122,6 +2174,8 @@ map.on('load', async () => {
   tintGreenLayers();
   boostDepthLayers();
   addAmbientCityGlow();
+  add3DBuildings();
+  setPremiumLighting();
   addRouteCutoffMasks();
   addPOIMarkers();
   await rebuildTrip(false);
