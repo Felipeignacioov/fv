@@ -908,6 +908,17 @@ function classifyOSMTags(tags) {
    de abajo es justamente "lo que sí tiene sentido buscar en el campo",
    nunca "lo urbano recortado". */
 const URBAN_CORE_RADIUS_KM = 3;
+/* Salamanca (centro) conserva exactamente las 8 categorías originales —
+   nada de escuelas, iglesias, sedes vecinales ni bencineras ahí, tal
+   como se decidió desde el principio para no saturar el centro. */
+const URBAN_ALLOWED_CATEGORIES = new Set([
+  'health', 'pharmacy', 'government', 'transport', 'bank', 'firestation', 'market', 'landmark'
+]);
+/* Las localidades rurales tienen su propio set: lo que realmente existe
+   y es relevante en el campo (postas, escuelas, iglesias, plazas, sedes
+   vecinales, bencineras, minimarkets) y el nombre del sector mismo. Un
+   banco o farmacia rural, si Overpass lo devolviera, no entra aquí — es
+   intencional, esas categorías son solo del centro. */
 const RURAL_ALLOWED_CATEGORIES = new Set([
   'health', 'school', 'church', 'landmark', 'locality', 'community', 'fuel', 'market'
 ]);
@@ -944,11 +955,14 @@ out center tags;`;
     const lat = el.lat !== undefined ? el.lat : (el.center && el.center.lat);
     const lon = el.lon !== undefined ? el.lon : (el.center && el.center.lon);
     if (lat === undefined || lon === undefined) return;
-    // Fuera del centro de Salamanca, solo entran las categorías
-    // realmente relevantes en zona rural (ver RURAL_ALLOWED_CATEGORIES).
-    // Dentro del radio urbano no se filtra nada, para no perder densidad.
+    // Dos listas separadas según la distancia al centro: dentro del radio
+    // urbano, solo las 8 categorías de siempre de Salamanca; fuera de ese
+    // radio, solo las categorías relevantes en zona rural. Ninguna de las
+    // dos zonas queda "sin filtro".
     const distKm = haversineMeters(GEO.salamanca, [lon, lat]) / 1000;
-    if (distKm > URBAN_CORE_RADIUS_KM && !RURAL_ALLOWED_CATEGORIES.has(category)) return;
+    const isUrban = distKm <= URBAN_CORE_RADIUS_KM;
+    const allowed = isUrban ? URBAN_ALLOWED_CATEGORIES : RURAL_ALLOWED_CATEGORIES;
+    if (!allowed.has(category)) return;
     const key = normalize(tags.name) + '|' + lat.toFixed(4) + ',' + lon.toFixed(4);
     if (seen.has(key)) return;
     seen.add(key);
