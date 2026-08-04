@@ -714,7 +714,39 @@ const AREA_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM);
    el usuario tenga aire antes de topar con el borde — no se usa para
    pedir datos, solo para el límite de paneo/zoom del mapa. */
 const MAP_NAV_BOUNDS = boundsFromRadius(GEO.salamanca, RADIUS_KM * 1.2);
+/* ---------- Optimización para gama media/baja: no renderizar nada fuera
+   de la zona operativa ----------
+   Hasta ahora solo ocultábamos visualmente algunos nombres (lista negra)
+   y algunas rutas (máscaras de corte), pero MapLibre seguía calculando
+   la colisión de TODAS las etiquetas y teselando TODAS las calles
+   visibles en el viewport, aunque el usuario nunca pueda navegar hasta
+   ahí. Con ['within', poligono] el motor directamente NO evalúa esas
+   features — no es "ocultar después de calcular", es "no calcular". Se
+   usa el área de navegación (con margen) para no cortar nada que sí se
+   pueda ver. */
+function polygonFromBounds(bounds) {
+  const [[minLon, minLat], [maxLon, maxLat]] = bounds;
+  return { type: 'Polygon', coordinates: [[[minLon, minLat], [maxLon, minLat], [maxLon, maxLat], [minLon, maxLat], [minLon, minLat]]] };
+}
+const OPERATIONAL_ZONE_POLYGON = polygonFromBounds(MAP_NAV_BOUNDS);
 
+function restrictBaseLayersToOperationalZone() {
+  const layers = map.getStyle().layers || [];
+  const withinExpr = ['within', OPERATIONAL_ZONE_POLYGON];
+  layers.forEach(layer => {
+    /* No tocar ninguna capa propia (POI, ruta, cortes, resplandor
+       ambiental) — esto es solo para el estilo base del mapa. */
+    if (layer.id.startsWith('poi-') || layer.id.startsWith('route-') ||
+        layer.id.startsWith('cutoff-') || layer.id.startsWith('city-glow')) return;
+    /* Solo líneas (calles) y símbolos (nombres/etiquetas) — no tocar
+       rellenos (agua, terreno, edificios) para no dejar huecos visuales. */
+    if (layer.type !== 'line' && layer.type !== 'symbol') return;
+    try {
+      const newFilter = layer.filter ? ['all', layer.filter, withinExpr] : withinExpr;
+      map.setFilter(layer.id, newFilter);
+    } catch (e) { /* alguna capa puede no aceptar el filtro combinado, se ignora sin romper el mapa */ }
+  });
+}
 const LOCATIONS = [
   { name: 'Plaza de Armas, Salamanca',                    coord: GEO.salamanca },
   { name: 'Municipalidad de Salamanca',                   coord: [-70.9659, -31.7810] },
@@ -1201,6 +1233,14 @@ function showToast(msg, duration = 4200) {
 }
 
 /* ---------- B. MAP INIT ---------- */
+/* Heurística simple y segura: navigator.hardwareConcurrency es el número
+   de núcleos lógicos del procesador, disponible en prácticamente todos
+   los navegadores móviles. 4 o menos suele corresponder a gama baja/
+   media-baja real. Solo se usa para desactivar el antialiasing (uno de
+   los ajustes más caros para la GPU) y el fundido entre tiles — ambos
+   son puramente cosméticos, nada de esto quita funcionalidad. */
+const isLowEndDevice = (navigator.hardwareConcurrency || 8) <= 4;
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/dark',
@@ -1212,14 +1252,9 @@ const map = new maplibregl.Map({
   minZoom: 11.4,
   maxZoom: 17,
   attributionControl: false,
-  antialias: true,
-  /* Inercia con más "peso": el mapa sigue deslizando un poco después de
-     soltar el gesto, con una curva de frenado progresiva en vez del tope
-     seco por defecto — la misma sensación de fluidez premium al arrastrar
-     o hacer zoom que Uber/Bolt. Es solo física de interacción que
-     MapLibre ya trae de fábrica, no una función nueva. */
+  antialias: !isLowEndDevice,
   dragPan: { linearity: 0.18, easing: (t) => t, deceleration: 1800, maxSpeed: 1300 },
-  fadeDuration: 250
+  fadeDuration: isLowEndDevice ? 0 : 250
 });
 
 map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -2063,6 +2098,7 @@ async function rebuildTrip(animate = true) {
 map.on('load', async () => {
   boostStyleVisibility();
   hidePlaceNamesByBlacklist();
+  restrictBaseLayersToOperationalZone();
   tintWaterLayers();
   tintGreenLayers();
   boostDepthLayers();
