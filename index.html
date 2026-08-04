@@ -1016,7 +1016,26 @@ function declutterPOIs(pois, minDistMeters = 90, maxTotal = 45) {
   }
   return kept;
 }
-
+/* El cupo de 45 se aplicaba sobre TODA la lista junta, y como las
+   localidades tienen la prioridad más alta (-1), llenaban el cupo antes
+   de que el hospital, el banco o el supermercado de Salamanca llegaran a
+   evaluarse — el centro quedaba vacío. Se separa en dos grupos por
+   distancia al centro y cada uno se recorta con su propio cupo: Salamanca
+   (radio urbano, área chica) nunca se recorta —cabe todo sin saturar—, y
+   el resto del área (15.3 km de radio, con decenas de localidades) sigue
+   con el mismo tope de 45 que ya tenía, para no saturar esa zona más
+   grande. */
+function declutterPOIsByZone(pois) {
+  const urban = [];
+  const rural = [];
+  pois.forEach(p => {
+    const distKm = haversineMeters(GEO.salamanca, p.coord) / 1000;
+    (distKm <= URBAN_CORE_RADIUS_KM ? urban : rural).push(p);
+  });
+  const keptUrban = declutterPOIs(urban, 90, urban.length);
+  const keptRural = declutterPOIs(rural, 90, 45);
+  return keptUrban.concat(keptRural);
+}
 /* ---------- POI: capa nativa GeoJSON + SymbolLayer (WebGL) ----------
    Refactor completo: los POI ya NO usan maplibregl.Marker con elementos
    HTML absolutamente posicionados (esa vía dependía de que el DOM y el
@@ -1184,7 +1203,7 @@ let POI_ICON_OPACITY_BASE = null;
 let POI_TEXT_OPACITY_BASE = null;
 
 function addPOILayer(rawPois) {
-  const data = poisToGeoJSON(declutterPOIs(rawPois));
+ const data = poisToGeoJSON(declutterPOIsByZone(rawPois));
 
   if (map.getSource('pois')) {
     map.getSource('pois').setData(data);
