@@ -1741,13 +1741,24 @@ async function snapToRoad(coord) {
 async function geocodeInArea(query) {
   try {
     const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=4&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&q=${encodeURIComponent(query + ', Salamanca, Choapa, Chile')}`;
+    /* Antes decía ", Salamanca, Choapa, Chile" fijo — eso sesgaba cada
+       búsqueda hacia el pueblo de Salamanca específicamente, perjudicando
+       resultados de direcciones en el resto del valle (Colliguay, El
+       Tambo, Chalinga, etc.). "Valle del Choapa" es correcto para
+       cualquier punto dentro de AREA_BOUNDS, que ya cubre todo el radio
+       operacional. bounded=1 + el filtro de abajo siguen garantizando que
+       nada fuera de la zona de cobertura pueda colarse. */
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&q=${encodeURIComponent(query + ', Valle del Choapa, Coquimbo, Chile')}`;
     const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
     if (!res.ok) throw new Error('Nominatim status ' + res.status);
     const data = await res.json();
     return data
       .filter(r => r.lon >= minLon && r.lon <= maxLon && r.lat >= minLat && r.lat <= maxLat)
-      .map(r => ({ name: r.display_name.split(',').slice(0, 2).join(',').trim(), coord: [parseFloat(r.lon), parseFloat(r.lat)] }));
+      .map(r => ({
+        name: r.display_name.split(',').slice(0, 2).join(',').trim(),
+        coord: [parseFloat(r.lon), parseFloat(r.lat)],
+        isAddress: true // distingue "dirección encontrada" de un POI/lugar predefinido
+      }));
   } catch (err) {
     return [];
   }
@@ -2392,7 +2403,10 @@ function renderList(list, results, onSelect, input, isDefault) {
     results.slice(0, 8).forEach(r => {
       const item = document.createElement('div');
       item.className = 'ac-item';
-      item.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span></span>';
+      const icon = r.isAddress
+        ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35" stroke-linecap="round"/></svg>'
+        : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg>';
+      item.innerHTML = icon + '<span></span>';
       item.querySelector('span').textContent = r.name;
       item.addEventListener('click', () => {
         input.value = r.name;
