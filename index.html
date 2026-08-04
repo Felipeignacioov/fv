@@ -1639,7 +1639,16 @@ function restartTravel() {
   pickNextTarget();
   pingTimer = setInterval(pickNextTarget, 4150 + Math.random() * 850);
 }
-
+/* Deja el vehículo quieto en su posición actual (el punto de recogida),
+   sin recorrer la ruta — se usa mientras el viaje todavía no fue
+   solicitado/asignado. tickCar no mueve el marcador si `travel` es null,
+   así que esto simplemente "pausa" el sistema de GPS-ping sin tocarlo. */
+function stopTravel() {
+  clearInterval(pingTimer);
+  pingTimer = null;
+  travel = null;
+  travelT = 0; travelDir = 1; lastBearingVal = 0; displayedBearing = 0;
+}
 /* ---------- F. CÁMARA: encuadre automático + transiciones suaves ---------- */
 /* Curva de suavizado compartida para todos los movimientos de cámara: evita
    aceleraciones/frenados bruscos al seguir la ruta, tanto en el encuadre
@@ -2040,7 +2049,11 @@ async function rebuildTrip(animate = true) {
     destMarker.setLngLat(destSnapped);
     carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
   }
-  restartTravel();
+ /* El auto queda estático en el punto de recogida (ya posicionado más
+     arriba con carMarker.setLngLat) hasta que el usuario solicite el
+     viaje y se le asigne un conductor — recién ahí startRequestFlow()
+     llama a restartTravel() para que empiece a moverse. */
+  stopTravel();
   fitRouteView(ROUTE_LINE, animate);
   updateMiniRoute();
   routeIsActive = true;
