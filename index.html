@@ -922,6 +922,19 @@ const URBAN_ALLOWED_CATEGORIES = new Set([
 const RURAL_ALLOWED_CATEGORIES = new Set([
   'health', 'school', 'church', 'landmark', 'locality', 'community', 'fuel', 'market'
 ]);
+/* POI puntuales que vienen reales desde OpenStreetMap pero que el usuario
+   confirmó que no debe mostrar: en Salamanca, el hospital antiguo (ya
+   fuera de servicio, en Matilde) y dos locales puntuales (Varoli en
+   Providencia, Santa Paulina en Matilde); y una serie de localidades/
+   sectores muy alejados o inaccesibles fuera de Salamanca. Se filtra por
+   nombre normalizado (sin tildes/mayúsculas) para que coincida sin
+   importar cómo venga escrito exactamente en OSM. */
+const POI_NAME_BLACKLIST = [
+  'Hopital Salamanca', 'Varoli', 'Santa Paulina',
+  'Las Cañas de Michío', 'Quebrada de Llapín', 'Quebrada de Michío',
+  'Cabrería', 'Lanco Alto', 'El Rincón', 'Moraleda', 'Punta Nueva',
+  'Población Nuevo Barrio Alto', 'Manquehua', 'Las Jarillas', 'Quelén Alto Sur'
+].map(normalize);
 
 async function fetchOSMPOIs() {
   const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
@@ -950,6 +963,7 @@ out center tags;`;
   (data.elements || []).forEach(el => {
     const tags = el.tags;
     if (!tags || !tags.name) return;
+    if (POI_NAME_BLACKLIST.includes(normalize(tags.name))) return;
     const category = classifyOSMTags(tags);
     if (!category) return;
     const lat = el.lat !== undefined ? el.lat : (el.center && el.center.lat);
