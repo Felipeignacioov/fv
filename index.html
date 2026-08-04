@@ -829,7 +829,11 @@ const POI_ICONS = {
   bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M4 10v9M8 10v9M12 10v9M16 10v9M20 10v9M2 21h20" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>',
   church: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
-  school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke-linejoin="round"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5" stroke-linejoin="round"/></svg>'
+  school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke-linejoin="round"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5" stroke-linejoin="round"/></svg>',
+  /* Localidades/sectores rurales (place=hamlet|village|town|locality en
+     OSM) — mismo glifo de pin que ya usa el botón "Usar como destino"
+     del popup, para no introducir un ícono nuevo ajeno al resto de la app. */
+  locality: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4"/></svg>'
 };
 
 /* Respaldo mínimo (solo entra en juego si Overpass no responde). Se
@@ -861,10 +865,14 @@ const POI_PLACES = [
    para no dejar el mapa vacío. */
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
-/* Solo las 8 categorías relevantes para un viaje en Salamanca: hospital,
-   farmacia, municipalidad, terminal, banco, bomberos, supermercado y
-   plaza. Todo lo demás (iglesias, cafés, comida, bencineras, deporte,
-   turismo) queda fuera para no saturar el mapa. */
+/* Las categorías relevantes para un viaje en la zona: hospital, farmacia,
+   municipalidad, terminal, banco, bomberos, supermercado, plaza y ahora
+   también localidades/sectores rurales (place=hamlet|village|town|
+   locality) — para que Chuchiñí, El Tambo, El Boldo, Villa El Faro,
+   Colliguay, El Queñe y demás sectores del radio de servicio aparezcan
+   como referencia geográfica real, tal cual los tiene catalogados OSM.
+   Todo lo demás (iglesias sin verificar, cafés, comida, bencineras,
+   deporte, turismo) queda fuera para no saturar el mapa. */
 function classifyOSMTags(tags) {
   if (!tags) return null;
   if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return 'health';
@@ -873,8 +881,13 @@ function classifyOSMTags(tags) {
   if (tags.amenity === 'bus_station') return 'transport';
   if (tags.amenity === 'bank') return 'bank';
   if (tags.amenity === 'fire_station') return 'firestation';
-  if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
+ if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
   if (tags.leisure === 'square' || tags.place === 'square') return 'landmark';
+  // Localidades/sectores rurales reales de OSM (no coordenadas escritas a
+  // mano): así entran Chuchiñí, El Tambo, El Boldo, Villa El Faro,
+  // Colliguay, El Queñe y cualquier otro sector dentro del radio, tal
+  // como los tenga catalogados OpenStreetMap.
+  if (tags.place === 'town' || tags.place === 'village' || tags.place === 'hamlet' || tags.place === 'locality') return 'locality';
   return null;
 }
 
@@ -888,6 +901,7 @@ node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
 way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
 node["leisure"="square"](${bbox});
 node["place"="square"](${bbox});
+node["place"~"^(town|village|hamlet|locality)$"](${bbox});
 );
 out center tags;`;
 
@@ -934,11 +948,22 @@ function haversineMeters(a, b) {
 }
 
 const POI_CATEGORY_PRIORITY = {
+  // Las localidades van primero: son la referencia geográfica principal
+  // en un área rural de 15+ km de radio (mucho más que solo el centro de
+  // Salamanca), así que el decluttering nunca debería descartarlas antes
+  // que un banco o un supermercado.
+  locality:-1,
   health:0, pharmacy:1, firestation:2, government:3, bank:4,
   transport:5, market:6, landmark:7, church:8, school:9
 };
 
-function declutterPOIs(pois, minDistMeters = 90, maxTotal = 20) {
+// Tope subido de 20 a 45: antes cubría en la práctica solo el centro de
+// Salamanca; con la cobertura ampliada a toda el área de operación (15.3
+// km de radio) hacía falta más margen para que quepan las localidades
+// rurales sin desplazar a los POI del centro. El filtrado por zoom de
+// abajo (isEssentialSize/iconOpacityExpr) es el que realmente evita que
+// se vea saturado, no este tope.
+function declutterPOIs(pois, minDistMeters = 90, maxTotal = 45) {
   const sorted = pois.slice().sort((a, b) =>
     (POI_CATEGORY_PRIORITY[a.category] ?? 99) - (POI_CATEGORY_PRIORITY[b.category] ?? 99)
   );
@@ -1137,7 +1162,7 @@ function addPOILayer(rawPois) {
      interpolate completos, se usa UN solo interpolate de zoom y, en cada
      parada, un "match" que decide el tamaño según la categoría. */
   const isEssentialSize = ['match', ['get', 'category'],
-    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'], true, false
+    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality'], true, false
   ];
   const sizeExpr = ['interpolate', ['linear'], ['zoom'],
     11, ['case', isEssentialSize, 0.46, 0.36],
@@ -1145,19 +1170,31 @@ function addPOILayer(rawPois) {
     17, ['case', isEssentialSize, 0.84, 0.68]
   ];
   const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
-  /* Todos los íconos son visibles desde lejos (nunca dependen de la
-     categoría) — lo que cambia con el zoom es únicamente el NOMBRE:
-       - alejado (zoom < 13.5): solo íconos, sin ningún nombre.
-       - distancia media (13.5–15.2): solo el nombre de los POI clave
-         (hospital, municipalidad, terminal, plaza, bomberos).
-       - cerca (>= 15.2): nombre de todos, incluidos los secundarios
-         (farmacia, banco, supermercado). */
+  /* Con la cobertura ampliada a toda la zona operacional (antes prácticamente
+     solo el centro), a escala baja ya no alcanza con atenuar apenas los
+     íconos secundarios (banco, farmacia, supermercado): ahora se OCULTAN
+     del todo (opacidad 0) hasta zoom 13.5, y desde ahí se revelan
+     progresivamente hasta quedar completos en 15.2 — el mismo umbral que
+     ya usa el nombre, para que ícono y nombre aparezcan juntos. Los
+     esenciales (salud, gobierno, transporte, plaza, bomberos, localidades
+     rurales) se ven siempre, prácticamente sin cambios respecto a antes.
+       - alejado (zoom < 13.5): solo íconos esenciales, sin ningún nombre.
+       - distancia media (13.5–15.2): esenciales a opacidad plena + el
+         resto de los íconos apareciendo de a poco; solo el nombre de los
+         POI clave.
+       - cerca (>= 15.2): todo visible, iconos y nombres, incluidos los
+         secundarios (farmacia, banco, supermercado). */
   /* church/school se agregan como esenciales porque son los únicos
      referentes en localidades rurales (El Tambo, Tahuinco) — ahí no hay
      "ruido" de otros POI con los que compitan, así que conviene que su
      nombre aparezca ya en zoom medio. */
-  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school'];
-  const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.75, 13, 0.88];
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality'];
+  const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'],
+    11,   ['case', isEssentialSize, 0.75, 0],
+    12.8, ['case', isEssentialSize, 0.8,  0],
+    13.5, ['case', isEssentialSize, 0.85, 0.5],
+    15.2, ['case', isEssentialSize, 0.88, 0.85]
+  ];
  const textOpacityExpr = ['step', ['zoom'],
     0,
     13.5, ['match', ['get', 'category'], ESSENTIAL_POI, 1, 0],
