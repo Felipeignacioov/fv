@@ -1050,6 +1050,9 @@ function poisToGeoJSON(pois) {
 let selectedPoiId = null;
 let poiPopup = null;
 
+const globalClickHandlers = [];
+function onGlobalClick(fn) { globalClickHandlers.push(fn); }
+
 function clearPoiSelection() {
   selectedPoiId = null;
   if (map.getSource('poi-selected')) {
@@ -1230,7 +1233,7 @@ function addPOILayer(rawPois) {
 
   /* Click fuera del mapa (paneles, botones, etc.) también limpia la
      selección activa — no solo los clics dentro del canvas del mapa. */
-  document.addEventListener('click', (e) => {
+ onGlobalClick((e) => {
     if (selectedPoiId === null) return;
     if (!map.getContainer().contains(e.target)) clearPoiSelection();
   });
@@ -1424,9 +1427,12 @@ function computeMetrics(line) {
 
 function pointAtT(tt) {
   const target = tt * ROUTE_TOTAL;
-  let i = 1;
-  while (i < routeLen.length && routeLen[i] < target) i++;
-  i = Math.min(i, routeLen.length - 1);
+  let lo = 1, hi = routeLen.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (routeLen[mid] < target) lo = mid + 1; else hi = mid;
+  }
+  const i = lo;
   const segLen = routeLen[i] - routeLen[i - 1] || 1e-9;
   const segT = (target - routeLen[i - 1]) / segLen;
   const [lon0, lat0] = ROUTE_LINE[i - 1], [lon1, lat1] = ROUTE_LINE[i];
@@ -1481,19 +1487,30 @@ const ROUTE_FLOW_LOOP_MS = 2808; // 2600ms + 8%
 const ROUTE_FLOW_PAUSE_MS = 500; // pausa al llegar al destino antes de reiniciar
 const ROUTE_FLOW_CYCLE_MS = ROUTE_FLOW_LOOP_MS + ROUTE_FLOW_PAUSE_MS;
 
+const ROUTE_FLOW_GRADIENT_STEPS = 240;
+const ROUTE_FLOW_GRADIENT_CACHE = new Array(ROUTE_FLOW_GRADIENT_STEPS + 1);
+for (let i = 0; i <= ROUTE_FLOW_GRADIENT_STEPS; i++) {
+  ROUTE_FLOW_GRADIENT_CACHE[i] = buildRouteFlowGradient(i / ROUTE_FLOW_GRADIENT_STEPS);
+}
+function getRouteFlowGradient(phase) {
+  const idx = Math.round(Math.max(0, Math.min(1, phase)) * ROUTE_FLOW_GRADIENT_STEPS);
+  return ROUTE_FLOW_GRADIENT_CACHE[idx];
+}
+
+let tabVisible = !document.hidden;
+document.addEventListener('visibilitychange', () => { tabVisible = !document.hidden; });
+
 function tickRouteFlow(now) {
-  if (map.getLayer('route-flow') && ROUTE_LINE.length > 1) {
+  if (tabVisible && map.getLayer('route-flow') && ROUTE_LINE.length > 1) {
     const cycleT = now % ROUTE_FLOW_CYCLE_MS;
     let phase;
     if (cycleT < ROUTE_FLOW_LOOP_MS) {
       const linearT = cycleT / ROUTE_FLOW_LOOP_MS;
-      // Ease-in-out cúbico: arranca y llega con más naturalidad, en vez
-      // de recorrer la ruta a velocidad constante de punta a punta.
       phase = linearT < 0.5 ? 4 * linearT ** 3 : 1 - Math.pow(-2 * linearT + 2, 3) / 2;
     } else {
       phase = 1;
     }
-    map.setPaintProperty('route-flow', 'line-gradient', buildRouteFlowGradient(phase));
+    map.setPaintProperty('route-flow', 'line-gradient', getRouteFlowGradient(phase));
   }
   requestAnimationFrame(tickRouteFlow);
 }
@@ -1534,7 +1551,7 @@ function addRouteLayers() {
     map.addLayer({ id: 'route-flow', type: 'line', source: 'route',
       layout: { 'line-cap': 'round', 'line-join': 'round' },
       paint: { 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
-        'line-gradient': buildRouteFlowGradient(0) } });
+       'line-gradient': getRouteFlowGradient(0) } });
   }
 
   let breatheT = 0;
@@ -1697,7 +1714,7 @@ function pickNextTarget() {
    recta entre dos pings — así no se puede "cortar camino" saliéndose de la
    calle aunque el tramo entre dos pings tenga una curva o esquina. */
 function tickCar(now) {
-  if (carMarker && travel && ROUTE_LINE.length > 1) {
+  if (tabVisible && carMarker && travel && ROUTE_LINE.length > 1) {
     const elapsed = now - travel.tStart;
     const frac = Math.min(1, elapsed / travel.duration);
     const eased = easeInOut(frac);
@@ -2261,7 +2278,7 @@ function setupAutocomplete(input, list, onSelect) {
     setSheet('expanded');
     setTimeout(() => { input.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 260);
   });
-  document.addEventListener('click', (e) => {
+  onGlobalClick((e) => {
     if (!input.closest('.field').contains(e.target)) list.classList.remove('show');
   });
 }
@@ -2449,7 +2466,7 @@ function onDragEnd(y) {
 }
 [sheetHandle, rcHead, rcPeek].forEach(el => {
   el.addEventListener('touchstart', e => onDragStart(e.touches[0].clientY), { passive: true });
-  el.addEventListener('touchend', e => onDragEnd(e.changedTouches[0].clientY));
+  el.addEventListener('touchend', e => onDragEnd(e.changedTouches[0].clientY), { passive: true });
 });
 
 document.getElementById('burgerBtn').addEventListener('click', () => {
@@ -2461,7 +2478,7 @@ document.getElementById('burgerBtn').addEventListener('click', () => {
 // nunca a "collapsed", que sería un salto de dos estados a la vez. Se
 // quita el foco del input activo para que el teclado también se cierre,
 // igual que en Uber/Google Maps.
-document.addEventListener('click', (e) => {
+onGlobalClick((e) => {
   if (window.innerWidth > 880) return;
   if (requestCard.dataset.sheet !== 'expanded') return;
   if (requestCard.contains(e.target)) return;
@@ -2486,11 +2503,15 @@ if (driverCardStatusRow) {
     if (!driverCard.classList.contains('collapsed')) driverCard.classList.add('collapsed');
   });
 }
-document.addEventListener('click', (e) => {
+onGlobalClick((e) => {
   if (!driverCard.classList.contains('assigned')) return;
   if (driverCard.classList.contains('collapsed')) return;
   if (driverCard.contains(e.target)) return;
   driverCard.classList.add('collapsed');
+});
+
+document.addEventListener('click', (e) => {
+  for (let i = 0; i < globalClickHandlers.length; i++) globalClickHandlers[i](e);
 });
 </script>
 </body>
