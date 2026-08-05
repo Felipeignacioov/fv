@@ -984,7 +984,18 @@ const POI_PLACES = [
    de Salamanca y se pintan los POI exactamente donde OSM los ubica. Si el
    servicio no responde, se usa POI_PLACES (arriba) como respaldo mínimo
    para no dejar el mapa vacío. */
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
+/* Varios espejos públicos de Overpass en cascada: el servidor principal
+   (overpass-api.de) se satura seguido —ya vimos un 504 Gateway Timeout
+   en pruebas anteriores—, lo que hacía caer directo al respaldo mínimo
+   POI_PLACES (que solo cubre Salamanca centro), dando la sensación de
+   "el resto del valle no carga". Si el primero falla, se reintenta con
+   espejos alternativos antes de rendirse. */
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.osm.ch/api/interpreter'
+];
+const POI_CACHE_KEY = 'choapaGoPoiCache';
 
 /* Las categorías relevantes para un viaje en la zona: hospital, farmacia,
    municipalidad, terminal, banco, bomberos, supermercado, plaza,
@@ -1068,13 +1079,24 @@ node["place"~"^(town|village|hamlet|locality)$"](${bbox});
 );
 out center tags;`;
 
-  const res = await fetch(OVERPASS_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(query)
-  });
-  if (!res.ok) throw new Error('Overpass status ' + res.status);
-  const data = await res.json();
+  let data = null;
+  let lastErr = null;
+  for (const endpoint of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query)
+      });
+      if (!res.ok) throw new Error('Overpass status ' + res.status);
+      data = await res.json();
+      break; // éxito con este espejo, no hace falta seguir probando
+    } catch (err) {
+      lastErr = err;
+      console.warn('Espejo de Overpass no disponible (' + endpoint + '):', err);
+    }
+  }
+  if (!data) throw lastErr || new Error('Ningún espejo de Overpass respondió');
 
   const seen = new Set();
   const pois = [];
@@ -1087,10 +1109,9 @@ out center tags;`;
     const lat = el.lat !== undefined ? el.lat : (el.center && el.center.lat);
     const lon = el.lon !== undefined ? el.lon : (el.center && el.center.lon);
     if (lat === undefined || lon === undefined) return;
-    // Dos listas separadas según la distancia al centro: dentro del radio
-    // urbano, solo las 8 categorías de siempre de Salamanca; fuera de ese
-    // radio, solo las categorías relevantes en zona rural. Ninguna de las
-    // dos zonas queda "sin filtro".
+    // Fuera del centro de Salamanca, solo entran las categorías
+    // realmente relevantes en zona rural (ver RURAL_ALLOWED_CATEGORIES).
+    // Dentro del radio urbano no se filtra nada, para no perder densidad.
     const distKm = haversineMeters(GEO.salamanca, [lon, lat]) / 1000;
     const isUrban = distKm <= URBAN_CORE_RADIUS_KM;
     const allowed = isUrban ? URBAN_ALLOWED_CATEGORIES : RURAL_ALLOWED_CATEGORIES;
@@ -1100,6 +1121,12 @@ out center tags;`;
     seen.add(key);
     pois.push({ name: tags.name, category, coord: [lon, lat] });
   });
+
+  // Se guarda el último resultado real exitoso: si en una carga futura
+  // TODOS los espejos fallan a la vez, se usa este dato (real, de OSM)
+  // en vez de saltar directo al respaldo mínimo de Salamanca centro.
+  try { localStorage.setItem(POI_CACHE_KEY, JSON.stringify({ pois, ts: Date.now() })); } catch (e) {}
+
   return pois;
 }
 
@@ -1490,7 +1517,12 @@ async function addPOIMarkers() {
     if (pois.length) { addPOILayer(pois); return; }
     throw new Error('Overpass devolvió 0 resultados');
   } catch (err) {
-    console.warn('No se pudo consultar Overpass (OpenStreetMap) para los POI, se usa el respaldo mínimo:', err);
+    console.warn('Ningún espejo de Overpass respondió, se busca un resultado en caché:', err);
+    try {
+      const cached = JSON.parse(localStorage.getItem(POI_CACHE_KEY) || 'null');
+      if (cached && cached.pois && cached.pois.length) { addPOILayer(cached.pois); return; }
+    } catch (e) { /* caché corrupta o no disponible, se ignora */ }
+    console.warn('Tampoco hay caché disponible, se usa el respaldo mínimo (solo Salamanca centro).');
     addPOILayer(POI_PLACES);
   }
 }
