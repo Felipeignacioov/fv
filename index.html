@@ -2776,6 +2776,21 @@ map.on('click', (e) => {
   // punto tocado está "vacío" de POI.
   const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
   if (poiFeatures.length) return;
+
+  // Tocar el mapa vacío mientras hay un POI seleccionado, o mientras el
+  // Target está expandido, se interpreta como "quiero salir de eso" — NO
+  // como "quiero ir a este punto". Solo cuando no hay nada abierto, un
+  // toque en el mapa vacío cuenta como elegir destino ahí. Este chequeo
+  // va primero (antes de que cualquier otro listener alcance a limpiar
+  // el estado), así siempre se lee la situación real del toque.
+  const sheetWasExpanded = window.innerWidth <= 880 && requestCard.dataset.sheet === 'expanded';
+  if (selectedPoiId !== null) { clearPoiSelection(); return; }
+  if (sheetWasExpanded) {
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    setSheet('mid');
+    return;
+  }
+
   showMapRipple(e.point);
   selectMapPointAsDestination(e.lngLat);
 });
