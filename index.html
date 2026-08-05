@@ -1763,7 +1763,24 @@ async function geocodeInArea(query) {
     return [];
   }
 }
-
+/* Geocodificación INVERSA: cuando el usuario toca un punto vacío del
+   mapa (no un POI), se le pide a Nominatim el nombre/dirección real más
+   cercano a esa coordenada — así el pin que aparece dice "Las Orquídeas,
+   El Tambo" en vez de solo un par de números. Si Nominatim no devuelve
+   nada útil (zona sin mapear a ese nivel de detalle), se usa un nombre
+   genérico más abajo — nunca se inventa una dirección. */
+async function reverseGeocodeLabel(coord) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coord[1]}&lon=${coord[0]}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    if (!res.ok) throw new Error('Nominatim reverse status ' + res.status);
+    const data = await res.json();
+    if (!data || !data.display_name) return null;
+    return data.display_name.split(',').slice(0, 2).join(',').trim();
+  } catch (err) {
+    return null;
+  }
+}
 /* ---------- D. MARCADORES NATIVOS ---------- */
 let carMarker, carEl, carFloatEl, carWrapEl, originMarker, destMarker;
 
@@ -2459,7 +2476,41 @@ swapBtn.addEventListener('click', () => {
   toText.value = currentDestination.name;
   rebuildTrip();
 });
+/* ---------- Tocar cualquier punto del mapa = elegirlo como destino ----------
+   Mismo principio que ya usan origen/destino y los POI: nunca se usa la
+   coordenada cruda tocada por el dedo — primero se ajusta (snap) a la
+   calle transitable más cercana vía OSRM (snapToRoad, ya existente), y
+   recién con esa coordenada ya "sobre la calle" se arma el viaje. El
+   nombre visible viene de geocodificación inversa real (Nominatim), con
+   un genérico solo como último recurso. Se reutiliza rebuildTrip(), así
+   que la ruta, la cámara y la ficha de la tarjeta se comportan exactamente
+   igual que al elegir un POI — ninguna lógica nueva de ruta ni de cámara. */
+async function selectMapPointAsDestination(lngLat) {
+  if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); return; }
 
+  const rawCoord = [lngLat.lng, lngLat.lat];
+  const distKm = haversineMeters(GEO.salamanca, rawCoord) / 1000;
+  if (distKm > RADIUS_KM) {
+    showToast('Ese punto queda fuera de la zona de servicio');
+    return;
+  }
+
+  const snapped = await snapToRoad(rawCoord);
+  const label = await reverseGeocodeLabel(snapped);
+  currentDestination = { name: label || 'Punto seleccionado', coord: snapped };
+  toText.value = currentDestination.name;
+  rebuildTrip();
+  if (window.innerWidth <= 880) setSheet('mid');
+}
+
+map.on('click', (e) => {
+  // Si el toque cayó sobre un POI, esa interacción ya la resuelve el
+  // listener de addPOILayer (selectPOI) — este otro solo actúa cuando el
+  // punto tocado está "vacío" de POI.
+  const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
+  if (poiFeatures.length) return;
+  selectMapPointAsDestination(e.lngLat);
+});
 function setPrice(eta, price) {
   ['etaText'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = eta; });
   ['priceText'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = price; });
