@@ -124,7 +124,13 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
    animación vive en .map-ripple-inner, un hijo aparte, para que ambos
    transforms no compitan entre sí (eso era lo que hacía que el ripple
    apareciera en la esquina en vez del punto tocado). */
-.map-ripple{ width:16px; height:16px; position:relative; pointer-events:none; }
+/* Fixed + coordenadas de píxel exactas (no geo-referenciado como un
+   Marker) — con el mapa inclinado (pitch) y los edificios 3D, un punto
+   "del mundo" no siempre reproyecta al píxel exacto donde tocaste. Como
+   este feedback dura menos de medio segundo y no necesita seguir al
+   mapa, ponerlo directo en el píxel tocado es más simple y siempre
+   preciso, sin importar pitch/zoom/3D. */
+.map-ripple{ position:fixed; width:16px; height:16px; pointer-events:none; z-index:5; transform:translate(-50%,-50%); }
 .map-ripple-inner{
   position:absolute; inset:0; border-radius:50%;
   border:1.5px solid var(--accent-2);
@@ -2523,12 +2529,15 @@ async function selectMapPointAsDestination(lngLat) {
   if (window.innerWidth <= 880) setSheet('mid');
 }
 
-function showMapRipple(lngLat) {
+function showMapRipple(point) {
+  const rect = map.getContainer().getBoundingClientRect();
   const el = document.createElement('div');
   el.className = 'map-ripple';
+  el.style.left = (rect.left + point.x) + 'px';
+  el.style.top = (rect.top + point.y) + 'px';
   el.innerHTML = '<div class="map-ripple-inner"></div>';
-  const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
-  setTimeout(() => marker.remove(), 480);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 480);
 }
 map.on('click', (e) => {
   // Si el toque cayó sobre un POI, esa interacción ya la resuelve el
@@ -2536,7 +2545,7 @@ map.on('click', (e) => {
   // punto tocado está "vacío" de POI.
   const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
   if (poiFeatures.length) return;
-  showMapRipple(e.lngLat);
+  showMapRipple(e.point);
   selectMapPointAsDestination(e.lngLat);
 });
 function setPrice(eta, price) {
