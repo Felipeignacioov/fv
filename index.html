@@ -422,7 +422,16 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 .save-suggest button{ font-family:inherit; font-size:11px; font-weight:700; padding:6px 11px; border-radius:8px; cursor:pointer; border:none; }
 #saveSuggestYes{ background:linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%); color:#06120D; }
 #saveSuggestNo{ background:transparent; color:var(--text-tertiary); }
-
+.place-pick-banner{
+  position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:32;
+  display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px;
+  background: var(--glass-fill-strong); border:1px solid rgba(232,196,140,0.32);
+  backdrop-filter: blur(20px) saturate(160%); box-shadow:0 16px 36px rgba(0,0,0,0.4);
+  opacity:0; pointer-events:none; transition: opacity .3s ease, transform .3s ease; max-width:88vw;
+}
+.place-pick-banner.show{ opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+.place-pick-banner span{ font-size:11.5px; font-weight:600; color:var(--text-primary); }
+.place-pick-banner button{ font-family:inherit; font-size:11px; font-weight:700; padding:6px 11px; border-radius:8px; cursor:pointer; border:1px solid rgba(255,255,255,0.12); background:transparent; color:var(--text-tertiary); }
 /* pantalla de búsqueda de conductor (estado 2) */
 .searching-overlay{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(6,8,11,0.38); backdrop-filter: blur(6px); opacity:0; pointer-events:none; transition: opacity .35s ease; }
 .searching-overlay.show{ opacity:1; pointer-events:auto; }
@@ -675,6 +684,10 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
   <span id="saveSuggestText">¿Guardar como favorito?</span>
   <button id="saveSuggestYes">Guardar</button>
   <button id="saveSuggestNo">Ahora no</button>
+</div>
+ <div class="place-pick-banner" id="placePickBanner">
+  <span>Busca y toca la ubicación exacta en el mapa</span>
+  <button id="placePickCancel">Cancelar</button>
 </div>
 <div class="map-loading" id="mapLoading">
   <div class="map-loading-spinner"></div>
@@ -1421,16 +1434,15 @@ function addPOILayer(rawPois) {
     paint: { ...textPaint, 'text-opacity': 1, 'icon-opacity': 1 }
   });
 
-  map.on('click', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
+ map.on('click', (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer', 'user-places-layer'] });
     if (features.length) selectPOI(features[0]);
     else clearPoiSelection();
   });
-  ['poi-layer', 'poi-selected-layer'].forEach(id => {
+  ['poi-layer', 'poi-selected-layer', 'user-places-layer'].forEach(id => {
     map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
     map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
   });
-
   /* Click fuera del mapa (paneles, botones, etc.) también limpia la
      selección activa — no solo los clics dentro del canvas del mapa. */
  onGlobalClick((e) => {
@@ -2522,6 +2534,8 @@ map.on('load', async () => {
   add3DBuildings();
   setPremiumLighting();
   addRouteCutoffMasks();
+  await ensureUserPlaceIcons();
+  refreshUserPlacesLayer();
   addPOIMarkers();
   await rebuildTrip(false);
   setTimeout(() => fitRouteView(ROUTE_LINE, true), 200);
@@ -2563,24 +2577,68 @@ function persistSavedPlaces() {
 let savedPlaces = loadSavedPlaces();
 if (!savedPlaces.favorites) savedPlaces.favorites = [];
 
-/* Alta rápida para un acceso vacío: pide una dirección real y la
-   geocodifica con el mismo motor (Nominatim, acotado a la zona) que ya
-   usa el buscador — nunca se guarda una coordenada inventada. */
-async function quickAddSlot(slotId, slotLabel) {
-  const query = window.prompt(`Dirección para "${slotLabel}" (ej: Las Orquídeas 63, El Tambo):`);
-  if (!query || !query.trim()) return;
-  const results = await geocodeInArea(query.trim());
-  if (!results.length) { showToast('No se encontró esa dirección dentro de la zona de servicio'); return; }
-  const place = { name: results[0].name, coord: results[0].coord };
-  if (slotId === 'favorite') {
+/* ---------- Alta de lugar guardado: SIEMPRE tocando el mapa, nunca
+   escribiendo una dirección. El usuario entra en "modo selección", toca
+   un punto de una calle, ese punto se ajusta a la vía real (mismo
+   snapToRoad/OSRM que usa el resto de la app), aparece un pin temporal,
+   y solo se pide el nombre para confirmar y guardar. */
+let placePickingMode = null; // { slotId, slotLabel, iconId }
+let placePickingPin = null;
+
+function startPlacePicking(slotId, slotLabel) {
+  if (placePickingMode) return;
+  placePickingMode = { slotId, slotLabel, iconId: USER_PLACE_ICON_BY_SLOT[slotId] || 'userfavorite' };
+  fromList.classList.remove('show'); toList.classList.remove('show');
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  setSheet('collapsed'); // deja ver el mapa casi completo para elegir el punto
+  const banner = document.getElementById('placePickBanner');
+  if (banner) banner.classList.add('show');
+}
+
+function cancelPlacePicking() {
+  placePickingMode = null;
+  if (placePickingPin) { placePickingPin.remove(); placePickingPin = null; }
+  const banner = document.getElementById('placePickBanner');
+  if (banner) banner.classList.remove('show');
+}
+
+async function confirmPlacePicking(lngLat) {
+  const mode = placePickingMode;
+  if (!mode) return;
+  const snapped = await snapToRoad([lngLat.lng, lngLat.lat]);
+
+  // Pin temporal (reutiliza el mismo diseño/halo animado de .pin-dest,
+  // solo con el acento en ámbar) mientras se confirma el nombre.
+  const el = document.createElement('div');
+  el.className = 'pin-dest';
+  el.innerHTML = `<div class="dest-halo"></div><svg viewBox="0 0 26 34" fill="none">
+      <path d="M13 33C13 33 25 19.7 25 13C25 5.8 19.6 0 13 0C6.4 0 1 5.8 1 13C1 19.7 13 33 13 33Z" fill="#ffffff" stroke="#E8A63C" stroke-width="1.4"/>
+      <circle cx="13" cy="13" r="5" fill="#E8A63C"/>
+    </svg>`;
+  if (placePickingPin) placePickingPin.remove();
+  placePickingPin = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(snapped).addTo(map);
+
+  const defaultName = mode.slotId === 'favorite' ? '' : mode.slotLabel;
+  const name = window.prompt('Nombre del lugar:', defaultName);
+  if (!name || !name.trim()) { cancelPlacePicking(); return; }
+
+  // TODO: cuando esté disponible Supabase, este objeto (name, coord,
+  // icon) es exactamente lo que hay que insertar en la tabla de lugares
+  // guardados del usuario — la forma de los datos ya queda lista.
+  const place = { name: name.trim(), coord: snapped, icon: mode.iconId };
+  if (mode.slotId === 'favorite') {
     place.id = 'fav_' + Date.now();
     savedPlaces.favorites.push(place);
   } else {
-    savedPlaces[slotId] = place;
+    savedPlaces[mode.slotId] = place;
   }
   persistSavedPlaces();
-  showToast(`"${slotLabel}" guardado`);
+  refreshUserPlacesLayer();
+  showToast(`"${place.name}" guardado`);
+  cancelPlacePicking();
 }
+
+document.getElementById('placePickCancel').addEventListener('click', (e) => { e.stopPropagation(); cancelPlacePicking(); });
 
 function renderSavedPlacesChips(list, onSelect, input) {
   const header = document.createElement('div');
@@ -2599,14 +2657,15 @@ function renderSavedPlacesChips(list, onSelect, input) {
     chip.type = 'button';
     chip.className = 'saved-chip' + (slot.place ? '' : ' empty');
     chip.innerHTML = `<span class="saved-chip-icon">${slot.icon}</span><span class="saved-chip-label">${slot.label}</span>`;
-    chip.addEventListener('click', (e) => {
+   chip.addEventListener('click', (e) => {
       e.stopPropagation();
       if (slot.place) {
         input.value = slot.place.name;
         list.classList.remove('show');
         onSelect(slot.place);
       } else {
-        quickAddSlot(slot.id, slot.isAddFavorite ? 'Nuevo favorito' : slot.label);
+        list.classList.remove('show');
+        startPlacePicking(slot.id, slot.isAddFavorite ? 'Favorito' : slot.label);
       }
     });
     row.appendChild(chip);
@@ -2657,6 +2716,98 @@ function recordDestinationVisit(place) {
   counts[key] = (counts[key] || 0) + 1;
   persistVisitCounts(counts);
   if (counts[key] === 3 && !isAlreadySaved(place.coord)) offerSaveAsFavorite(place);
+}
+/* ---------- Íconos de lugares guardados: mismo mecanismo de horneado
+   que los POI públicos (buildPoiMarkerSVG), pero en tono ÁMBAR
+   (#E8C48C, el mismo cálido del resplandor ambiental) para que se
+   distingan de un vistazo de un POI público (esmeralda) sin salirse de
+   la paleta de la app. IDs con prefijo "user" para no colisionar con
+   categorías de POI públicos (ej. "gym" ya existe como categoría
+   pública). */
+const USER_PLACE_ICONS = {
+  userhome: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 10v10h14V10" stroke-linejoin="round"/><path d="M9 20v-6h6v6" stroke-linejoin="round"/></svg>',
+  userwork: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke-linejoin="round"/></svg>',
+  usergym: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6M20 9v6M7 7v10M17 7v10M7 12h10" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  userfavorite: '<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.5l2.6 5.6 6.1.6-4.6 4.1 1.4 6-5.5-3.2-5.5 3.2 1.4-6-4.6-4.1 6.1-.6z"/></svg>'
+};
+const USER_PLACE_ICON_BY_SLOT = { home: 'userhome', work: 'userwork', gym: 'usergym' };
+
+function userPlaceIconInnerMarkup(type) {
+  const raw = USER_PLACE_ICONS[type] || USER_PLACE_ICONS.userfavorite;
+  const match = raw.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
+  return match ? match[1] : '';
+}
+
+function buildUserPlaceMarkerSVG(type, active) {
+  const size = 64;
+  const inner = userPlaceIconInnerMarkup(type);
+  const stroke = active ? '#F3DBAE' : 'rgba(232,196,140,0.65)';
+  const strokeW = active ? 2.6 : 1.8;
+  const bg1 = active ? 'rgba(90,68,8,0.95)' : 'rgba(26,22,15,0.92)';
+  const bg2 = active ? 'rgba(46,33,5,0.95)' : 'rgba(15,13,9,0.92)';
+  const glow = active ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#E8C48C" stroke-width="1.4" opacity="0.5"/>` : '';
+  const fillMode = type === 'userfavorite' ? '#E8C48C' : 'none';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <defs>
+      <linearGradient id="userBg-${type}-${active ? 'a' : 'n'}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/>
+      </linearGradient>
+    </defs>
+    ${glow}
+    <circle cx="32" cy="32" r="26" fill="url(#userBg-${type}-${active ? 'a' : 'n'})" stroke="${stroke}" stroke-width="${strokeW}"/>
+    <g transform="translate(18,18) scale(1.17)" fill="${fillMode}" stroke="#E8C48C" style="color:#E8C48C" opacity="${active ? 1 : 0.92}">${inner}</g>
+  </svg>`;
+}
+
+let userPlaceIconsReady = null;
+function ensureUserPlaceIcons() {
+  if (userPlaceIconsReady) return userPlaceIconsReady;
+  const types = Object.keys(USER_PLACE_ICONS);
+  userPlaceIconsReady = Promise.all(types.map(async (type) => {
+    const [imgNormal, imgActive] = await Promise.all([
+      loadImagePromise(svgToDataUrl(buildUserPlaceMarkerSVG(type, false))),
+      loadImagePromise(svgToDataUrl(buildUserPlaceMarkerSVG(type, true)))
+    ]);
+    if (!map.hasImage(type)) map.addImage(type, imgNormal, { pixelRatio: 2 });
+    if (!map.hasImage(type + '-active')) map.addImage(type + '-active', imgActive, { pixelRatio: 2 });
+  }));
+  return userPlaceIconsReady;
+}
+
+/* ---------- Capa nativa de lugares guardados (misma técnica GeoJSON +
+   SymbolLayer que los POI públicos, fuente/capa aparte para no tocar su
+   decluttering, prioridad ni filtrado por zoom). Siempre visibles, sin
+   filtro de zoom — son pocos y son del usuario, no deberían "esconderse". */
+function userPlacesToGeoJSON() {
+  const list = [];
+  ['home', 'work', 'gym'].forEach(key => { if (savedPlaces[key]) list.push(savedPlaces[key]); });
+  savedPlaces.favorites.forEach(f => list.push(f));
+  return {
+    type: 'FeatureCollection',
+    features: list.map((p, i) => ({
+      type: 'Feature', id: 'user-' + i,
+      geometry: { type: 'Point', coordinates: p.coord },
+      properties: { name: p.name, category: p.icon || 'userfavorite' }
+    }))
+  };
+}
+
+function refreshUserPlacesLayer() {
+  const data = userPlacesToGeoJSON();
+  if (map.getSource('user-places')) { map.getSource('user-places').setData(data); return; }
+  map.addSource('user-places', { type: 'geojson', data });
+  map.addLayer({
+    id: 'user-places-layer', type: 'symbol', source: 'user-places',
+    layout: {
+      'icon-image': ['get', 'category'],
+      'icon-size': ['interpolate', ['linear'], ['zoom'], 11, 0.5, 14, 0.66, 17, 0.9],
+      'icon-allow-overlap': true, 'icon-ignore-placement': true, 'icon-anchor': 'center',
+      'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 12, 9, 15, 10.5, 17, 11.5],
+      'text-offset': [0, 1.4], 'text-anchor': 'top', 'text-allow-overlap': false, 'text-optional': true, 'text-max-width': 8
+    },
+    paint: { 'text-color': '#F3DBAE', 'text-halo-color': 'rgba(6,9,12,0.85)', 'text-halo-width': 1 }
+  });
 }
 
 function renderList(list, results, onSelect, input, isDefault, showSaved) {  
@@ -2771,10 +2922,14 @@ function showMapRipple(point) {
   setTimeout(() => el.remove(), 480);
 }
 map.on('click', (e) => {
-  // Si el toque cayó sobre un POI, esa interacción ya la resuelve el
-  // listener de addPOILayer (selectPOI) — este otro solo actúa cuando el
-  // punto tocado está "vacío" de POI.
-  const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
+  // El modo de selección de lugar guardado tiene prioridad sobre
+  // cualquier otra interacción del mapa mientras está activo.
+  if (placePickingMode) { confirmPlacePicking(e.lngLat); return; }
+
+  // Si el toque cayó sobre un POI (público o guardado), esa interacción
+  // ya la resuelve el listener de addPOILayer (selectPOI) — este otro
+  // solo actúa cuando el punto tocado está "vacío".
+  const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer', 'user-places-layer'] });
   if (poiFeatures.length) return;
 
   // Tocar el mapa vacío mientras hay un POI seleccionado, o mientras el
