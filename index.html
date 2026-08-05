@@ -3099,6 +3099,15 @@ function startRequestFlow() {
         requestBtn.classList.remove('enroute');
         requestBtnLabel.textContent = 'Pedir viaje';
         cancelTripBtn.classList.remove('visible');
+        // El viaje terminó: la tarjeta/píldora del conductor ya no debe
+        // seguir arriba (antes se quedaba pegada como si el viaje
+        // continuara). Se avisa con el mismo toast de éxito que ya usan
+        // los lugares guardados, para mantener el mismo lenguaje visual.
+        clearTimeout(driverCollapseTimer);
+        driverCard.classList.remove('visible', 'assigned', 'collapsed');
+        stopTravel();
+        carEl.classList.remove('visible');
+        showSuccessToast('Tu conductor ha llegado');
         busy = false;
       }, PICKUP_ETA_MS);
     }, 1300);
