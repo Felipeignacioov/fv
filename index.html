@@ -115,6 +115,21 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 /* =====================================================================
    3) CUSTOM MAP MARKERS
    ===================================================================== */
+/* Ripple sutil al tocar un punto del mapa: onda que se expande desde el
+   punto tocado mientras pierde opacidad, y desaparece del DOM antes de
+   500ms — feedback inmediato de "toqué aquí" mientras se resuelve el
+   snap-to-road/geocodificación en segundo plano. */
+.map-ripple{
+  width:16px; height:16px; border-radius:50%;
+  border:1.5px solid var(--accent-2);
+  background: rgba(16,185,129,0.14);
+  pointer-events:none;
+  animation: rippleExpand 480ms cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes rippleExpand{
+  0%{ transform:scale(0.3); opacity:0.85; }
+  100%{ transform:scale(3.4); opacity:0; }
+}     
 .pin-origin{ width:16px; height:16px; position:relative; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.35)); }
 .pin-origin .core{ width:100%; height:100%; border-radius:50%; background:#0B0F14; border:2px solid var(--accent-2); box-shadow:0 0 8px rgba(16,185,129,0.55); }
 .pin-origin .core::after{ content:''; position:absolute; inset:4px; border-radius:50%; background:var(--accent-2); }
@@ -2503,12 +2518,20 @@ async function selectMapPointAsDestination(lngLat) {
   if (window.innerWidth <= 880) setSheet('mid');
 }
 
+function showMapRipple(lngLat) {
+  const el = document.createElement('div');
+  el.className = 'map-ripple';
+  const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(lngLat).addTo(map);
+  setTimeout(() => marker.remove(), 480);
+}
+
 map.on('click', (e) => {
   // Si el toque cayó sobre un POI, esa interacción ya la resuelve el
   // listener de addPOILayer (selectPOI) — este otro solo actúa cuando el
   // punto tocado está "vacío" de POI.
   const poiFeatures = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
   if (poiFeatures.length) return;
+  showMapRipple(e.lngLat);
   selectMapPointAsDestination(e.lngLat);
 });
 function setPrice(eta, price) {
