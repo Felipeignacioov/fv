@@ -372,6 +372,36 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 .ac-item svg{ width:12px; height:12px; flex-shrink:0; opacity:.7; }
 .ac-empty{ padding:10px 12px; font-size:11px; color:var(--text-tertiary); text-align:center; }
 
+/* ---------- Lugares guardados: chips de acceso rápido ---------- */
+.saved-places-row{ display:flex; gap:7px; overflow-x:auto; padding:2px 12px 10px; -webkit-overflow-scrolling:touch; }
+.saved-places-row::-webkit-scrollbar{ display:none; }
+.saved-chip{
+  flex-shrink:0; display:flex; align-items:center; gap:5px; padding:7px 11px; border-radius:999px;
+  border:1px solid var(--border-glass-strong); background:rgba(255,255,255,0.03);
+  color:var(--text-primary); font-size:11px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition: background .15s ease, border-color .15s ease, transform .12s ease;
+}
+.saved-chip:active{ transform:scale(.95); background:rgba(5,150,105,0.14); }
+@media (hover:hover) and (pointer:fine){
+  .saved-chip:hover{ background:rgba(5,150,105,0.1); border-color:rgba(5,150,105,0.28); }
+}
+.saved-chip.empty{ color:var(--text-tertiary); border-style:dashed; }
+.saved-chip-icon{ font-size:13px; line-height:1; }
+
+/* ---------- Banner "¿guardar como favorito?" ---------- */
+.save-suggest{
+  position:fixed; left:50%; bottom:96px; transform:translate(-50%,8px); z-index:30;
+  display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px;
+  background: var(--glass-fill-strong); border:1px solid var(--border-glass-strong);
+  backdrop-filter: blur(20px) saturate(160%); box-shadow:0 16px 36px rgba(0,0,0,0.4);
+  opacity:0; pointer-events:none; transition: opacity .3s ease, transform .3s ease; max-width:88vw;
+}
+.save-suggest.show{ opacity:1; transform:translate(-50%,0); pointer-events:auto; }
+.save-suggest span{ font-size:11.5px; font-weight:600; color:var(--text-primary); }
+.save-suggest button{ font-family:inherit; font-size:11px; font-weight:700; padding:6px 11px; border-radius:8px; cursor:pointer; border:none; }
+#saveSuggestYes{ background:linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%); color:#06120D; }
+#saveSuggestNo{ background:transparent; color:var(--text-tertiary); }
+
 /* pantalla de búsqueda de conductor (estado 2) */
 .searching-overlay{ position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; background:rgba(6,8,11,0.38); backdrop-filter: blur(6px); opacity:0; pointer-events:none; transition: opacity .35s ease; }
 .searching-overlay.show{ opacity:1; pointer-events:auto; }
@@ -613,6 +643,11 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
 <div class="map-atmosphere"></div>
 <div class="sheet-scrim"></div>
 <div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
+<div class="save-suggest" id="saveSuggest">
+  <span id="saveSuggestText">¿Guardar como favorito?</span>
+  <button id="saveSuggestYes">Guardar</button>
+  <button id="saveSuggestNo">Ahora no</button>
+</div>
 <div class="map-loading" id="mapLoading">
   <div class="map-loading-spinner"></div>
   <div class="map-loading-text">Cargando el mapa…</div>
@@ -2398,6 +2433,11 @@ async function rebuildTrip(animate = true) {
   updateMiniRoute();
   routeIsActive = true;
   setPOIRouteEmphasis(routeIsActive);
+  // animate=true identifica un cambio de destino hecho por el usuario
+  // (autocompletado, POI, tap en el mapa, chip de "Tus lugares"); la
+  // carga inicial llama rebuildTrip(false), así que nunca cuenta visitas
+  // del viaje precargado por defecto.
+  if (animate) recordDestinationVisit(currentDestination);
 }
 
 /* ---------- Salto visual premium: edificios 3D + luz direccional ----------
@@ -2469,8 +2509,130 @@ const toList = document.getElementById('toList');
    "Destinos populares" predeterminados de Salamanca (Plaza de Armas,
    Municipalidad, Terminal, Hospital, etc.); al escribir, filtra sobre
    ese mismo listado y complementa con geocodificación en vivo. */
-function renderList(list, results, onSelect, input, isDefault) {
+   /* ---------- Lugares guardados (personal, por navegador) ----------
+   Persistidos en localStorage — nunca se envían a ningún servidor (esta
+   app no tiene backend), así que quedan visibles únicamente en el
+   dispositivo/navegador de cada usuario. Se muestran como accesos
+   rápidos arriba de las sugerencias de destino, antes de los resultados
+   de búsqueda. */
+const SAVED_PLACES_KEY = 'choapaGoSavedPlaces';
+const DEFAULT_SAVED_SLOTS = [
+  { id: 'home', icon: '🏠', label: 'Casa' },
+  { id: 'work', icon: '💼', label: 'Trabajo' },
+  { id: 'gym',  icon: '🏋️', label: 'Gimnasio' }
+];
+
+function loadSavedPlaces() {
+  try {
+    const raw = localStorage.getItem(SAVED_PLACES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
+function persistSavedPlaces() {
+  try { localStorage.setItem(SAVED_PLACES_KEY, JSON.stringify(savedPlaces)); } catch (e) { /* almacenamiento no disponible, se ignora */ }
+}
+let savedPlaces = loadSavedPlaces();
+if (!savedPlaces.favorites) savedPlaces.favorites = [];
+
+/* Alta rápida para un acceso vacío: pide una dirección real y la
+   geocodifica con el mismo motor (Nominatim, acotado a la zona) que ya
+   usa el buscador — nunca se guarda una coordenada inventada. */
+async function quickAddSlot(slotId, slotLabel) {
+  const query = window.prompt(`Dirección para "${slotLabel}" (ej: Las Orquídeas 63, El Tambo):`);
+  if (!query || !query.trim()) return;
+  const results = await geocodeInArea(query.trim());
+  if (!results.length) { showToast('No se encontró esa dirección dentro de la zona de servicio'); return; }
+  const place = { name: results[0].name, coord: results[0].coord };
+  if (slotId === 'favorite') {
+    place.id = 'fav_' + Date.now();
+    savedPlaces.favorites.push(place);
+  } else {
+    savedPlaces[slotId] = place;
+  }
+  persistSavedPlaces();
+  showToast(`"${slotLabel}" guardado`);
+}
+
+function renderSavedPlacesChips(list, onSelect, input) {
+  const header = document.createElement('div');
+  header.className = 'ac-header';
+  header.textContent = 'Tus lugares';
+  list.appendChild(header);
+
+  const row = document.createElement('div');
+  row.className = 'saved-places-row';
+  const slots = DEFAULT_SAVED_SLOTS.map(s => ({ ...s, place: savedPlaces[s.id] || null }));
+  savedPlaces.favorites.forEach(f => slots.push({ id: f.id, icon: '⭐', label: f.name.split(',')[0].trim(), place: f }));
+  slots.push({ id: 'favorite', icon: '⭐', label: 'Agregar', place: null, isAddFavorite: true });
+
+  slots.forEach(slot => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'saved-chip' + (slot.place ? '' : ' empty');
+    chip.innerHTML = `<span class="saved-chip-icon">${slot.icon}</span><span class="saved-chip-label">${slot.label}</span>`;
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (slot.place) {
+        input.value = slot.place.name;
+        list.classList.remove('show');
+        onSelect(slot.place);
+      } else {
+        quickAddSlot(slot.id, slot.isAddFavorite ? 'Nuevo favorito' : slot.label);
+      }
+    });
+    row.appendChild(chip);
+  });
+  list.appendChild(row);
+}
+
+/* ---------- Sugerencia automática de guardar como favorito ---------- */
+const VISIT_COUNTS_KEY = 'choapaGoVisitCounts';
+function loadVisitCounts() {
+  try { return JSON.parse(localStorage.getItem(VISIT_COUNTS_KEY) || '{}'); } catch (e) { return {}; }
+}
+function persistVisitCounts(counts) {
+  try { localStorage.setItem(VISIT_COUNTS_KEY, JSON.stringify(counts)); } catch (e) {}
+}
+function isAlreadySaved(coord) {
+  const near = (a, b) => haversineMeters(a, b) < 60;
+  if (savedPlaces.home && near(savedPlaces.home.coord, coord)) return true;
+  if (savedPlaces.work && near(savedPlaces.work.coord, coord)) return true;
+  if (savedPlaces.gym && near(savedPlaces.gym.coord, coord)) return true;
+  return savedPlaces.favorites.some(f => near(f.coord, coord));
+}
+function offerSaveAsFavorite(place) {
+  const banner = document.getElementById('saveSuggest');
+  const text = document.getElementById('saveSuggestText');
+  const yesBtn = document.getElementById('saveSuggestYes');
+  const noBtn = document.getElementById('saveSuggestNo');
+  if (!banner || !text || !yesBtn || !noBtn) return;
+  text.textContent = `¿Guardar "${place.name.split(',')[0].trim()}" como favorito?`;
+  banner.classList.add('show');
+  const cleanup = () => { banner.classList.remove('show'); yesBtn.onclick = null; noBtn.onclick = null; };
+  yesBtn.onclick = () => {
+    savedPlaces.favorites.push({ id: 'fav_' + Date.now(), name: place.name, coord: place.coord });
+    persistSavedPlaces();
+    showToast('Agregado a favoritos');
+    cleanup();
+  };
+  noBtn.onclick = cleanup;
+  setTimeout(cleanup, 6000);
+}
+/* Se llama solo cuando el DESTINO cambia por una acción real del usuario
+   (no en la carga inicial) — a la 3ra vez que pide el mismo destino, y
+   si todavía no está guardado, se ofrece guardarlo. */
+function recordDestinationVisit(place) {
+  if (!place || !place.coord) return;
+  const counts = loadVisitCounts();
+  const key = normalize(place.name);
+  counts[key] = (counts[key] || 0) + 1;
+  persistVisitCounts(counts);
+  if (counts[key] === 3 && !isAlreadySaved(place.coord)) offerSaveAsFavorite(place);
+}
+
+function renderList(list, results, onSelect, input, isDefault, showSaved) {  
   list.innerHTML = '';
+  if (showSaved) renderSavedPlacesChips(list, onSelect, input);
   if (isDefault && results.length) {
     const header = document.createElement('div');
     header.className = 'ac-header';
@@ -2502,7 +2664,7 @@ function renderList(list, results, onSelect, input, isDefault) {
   list.classList.add('show');
 }
 
-function setupAutocomplete(input, list, onSelect) {
+function setupAutocomplete(input, list, onSelect, showSaved = false) {
   let debounceT;
   input.addEventListener('input', () => {
     clearTimeout(debounceT);
@@ -2510,13 +2672,13 @@ function setupAutocomplete(input, list, onSelect) {
     const qn = normalize(q);
     const isDefault = q.length === 0;
     let results = q.length ? LOCATIONS.filter(l => normalize(l.name).includes(qn)) : LOCATIONS.slice(0, 8);
-    renderList(list, results, onSelect, input, isDefault);
+    renderList(list, results, onSelect, input, isDefault, showSaved);
     debounceT = setTimeout(async () => {
       if (q.length <= 2) return;
       const live = await geocodeInArea(q);
       const merged = results.slice();
       live.forEach(r => { if (!merged.some(x => normalize(x.name) === normalize(r.name))) merged.push(r); });
-      if (document.activeElement === input) renderList(list, merged, onSelect, input, false);
+      if (document.activeElement === input) renderList(list, merged, onSelect, input, false, showSaved);
     }, 320);
   });
   input.addEventListener('focus', () => {
@@ -2529,11 +2691,11 @@ function setupAutocomplete(input, list, onSelect) {
   });
 }
 
-setupAutocomplete(fromText, fromList, (loc) => { currentOrigin = loc; rebuildTrip(); });
+setupAutocomplete(fromText, fromList, (loc) => { currentOrigin = loc; rebuildTrip(); }, false);
 setupAutocomplete(toText, toList, (loc) => {
   if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); toText.value = currentDestination.name; return; }
   currentDestination = loc; rebuildTrip();
-});
+}, true);
 
 swapBtn.addEventListener('click', () => {
   if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); return; }
