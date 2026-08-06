@@ -2653,8 +2653,18 @@ async function rebuildTrip(animate = true) {
   const originSnapped = await snapToRoad(currentOrigin.coord);
   const destSnapped = await snapToRoad(currentDestination.coord);
   await buildRoute(originSnapped, destSnapped);
+  // El marcador de DESTINO se muestra en la coordenada EXACTA elegida
+  // (currentDestination.coord) — nunca en el punto ajustado a la calle
+  // (destSnapped). destSnapped se sigue usando para que OSRM calcule el
+  // trayecto real hasta el acceso transitable más cercano; la ruta
+  // termina en la calle, pero el pin queda en el lugar real (dentro de
+  // la parcela/vivienda si corresponde), igual que en Uber/Google Maps.
   if (!originMarker) {
-    buildOriginDestinationMarkers(originSnapped, destSnapped);
+    buildOriginDestinationMarkers(originSnapped, currentDestination.coord);
+  } else {
+    originMarker.setLngLat(originSnapped);
+    destMarker.setLngLat(currentDestination.coord);
+    carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
   } else {
     originMarker.setLngLat(originSnapped);
     destMarker.setLngLat(destSnapped);
@@ -2795,6 +2805,14 @@ function startPlacePicking(slotId, slotLabel, editFavoriteId) {
   if (saveBtn) saveBtn.disabled = true;
   if (banner) banner.classList.add('show');
   if (pin) pin.classList.add('show');
+
+  // Zoom alto para poder ubicar el pin con precisión (dentro de una
+  // parcela, vivienda o condominio) — si ya se estaba a un zoom cercano,
+  // la cámara no se mueve de más.
+  const PLACE_PICK_MIN_ZOOM = 17.2;
+  if (map.getZoom() < PLACE_PICK_MIN_ZOOM) {
+    map.easeTo({ zoom: PLACE_PICK_MIN_ZOOM, duration: 700, easing: cameraEasing, essential: true });
+  }
 }
 
 function cancelPlacePicking() {
@@ -2813,13 +2831,18 @@ async function confirmPlacePicking() {
   const mode = placePickingMode;
   if (!mode) return;
   const center = map.getCenter();
-  const snapped = await snapToRoad([center.lng, center.lat]);
+  // Ya NO se ajusta a la calle más cercana al guardar: el lugar personal
+  // puede quedar exactamente donde el usuario lo puso (dentro de una
+  // parcela, vivienda, condominio, etc.) — el ajuste a vía transitable
+  // se hace después, solo al calcular la ruta hacia este lugar (ver
+  // rebuildTrip), nunca al guardar su posición.
+  const exactCoord = [center.lng, center.lat];
 
   // "Cambiar ubicación" de un lugar ya existente: solo se actualiza la
   // coordenada, el nombre no se toca ni se vuelve a preguntar.
   if (mode.editFavoriteId) {
     const idx = savedPlaces.favorites.findIndex(f => f.id === mode.editFavoriteId);
-    if (idx !== -1) savedPlaces.favorites[idx] = { ...savedPlaces.favorites[idx], coord: snapped };
+    if (idx !== -1) savedPlaces.favorites[idx] = { ...savedPlaces.favorites[idx], coord: exactCoord };
     persistSavedPlaces();
     refreshUserPlacesLayer();
     showSuccessToast('Ubicación actualizada');
@@ -2841,7 +2864,7 @@ async function confirmPlacePicking() {
   // TODO: cuando esté disponible Supabase, este objeto (name, coord,
   // icon) es exactamente lo que hay que insertar en la tabla de lugares
   // guardados del usuario — la forma de los datos ya queda lista.
-  const place = { name, coord: snapped, icon: mode.iconId };
+ const place = { name, coord: exactCoord, icon: mode.iconId };
   if (mode.slotId === 'favorite') {
     place.id = 'fav_' + Date.now();
     savedPlaces.favorites.push(place);
