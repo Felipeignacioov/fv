@@ -971,11 +971,8 @@ const POI_PLACES = [
   { name: 'Super Bodega aCuenta',       category: 'market',     coord: [-70.9621, -31.7820] },
   { name: 'Supermercado Piolín',        category: 'market',     coord: [-70.9633, -31.7822] },
   { name: 'Farmacia Jarufe',            category: 'pharmacy',   coord: [-70.9645, -31.7784] },
-  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] },
-  /* Estadio Municipal de Salamanca (El Aquelarre) — José Manuel Infante
-     alt. 486. Coordenada verificada en OpenStreetMap (way 89568616,
-     leisure=pitch, sport=soccer). */
-  { name: 'Estadio Municipal de Salamanca', category: 'stadium', coord: [-70.970128, -31.783034] },
+  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] }
+];
   /* POI rurales del valle, verificados por el usuario vía enlace de
      Google Maps (coordenadas reales del pin, no aproximadas). */
   { name: 'IEP El Tambo',               category: 'church',     coord: [-71.0226152, -31.7860923] },
@@ -1516,20 +1513,40 @@ function setPOIRouteEmphasis(active) {
   map.setPaintProperty('poi-layer', 'text-opacity', ['*', POI_TEXT_OPACITY_BASE, factor]);
 }
 
+/* POI verificados manualmente (coordenada real confirmada por el
+   usuario, vía Google Maps u OpenStreetMap) que NO dependen de que
+   Overpass los tenga catalogados con ese nombre exacto. A diferencia de
+   POI_PLACES (que es solo un respaldo de emergencia si Overpass falla
+   del todo), estos SIEMPRE se agregan al resultado — si no, en el uso
+   normal (Overpass respondiendo bien) nunca llegarían a verse. */
+const MANUAL_VERIFIED_POIS = [
+  { name: 'Estadio Municipal de Salamanca', category: 'stadium', coord: [-70.970128, -31.783034] },
+  { name: 'IEP El Tambo',               category: 'church',     coord: [-71.0226152, -31.7860923] },
+  { name: 'Colegio Tahuinco',           category: 'school',     coord: [-71.0571533, -31.7906912] },
+  { name: 'Almacén Flores, Colliguay',  category: 'market',     coord: [-71.016759, -31.8236639] },
+  { name: 'Sofit Gimnasio Salamanca',   category: 'gym',        coord: [-70.9613, -31.7824] }
+];
+
+function mergeManualVerifiedPois(pois) {
+  const seen = new Set(pois.map(p => normalize(p.name)));
+  const extra = MANUAL_VERIFIED_POIS.filter(p => !seen.has(normalize(p.name)));
+  return pois.concat(extra);
+}
+
 async function addPOIMarkers() {
   await ensurePoiIcons();
   try {
     const pois = await fetchOSMPOIs();
-    if (pois.length) { addPOILayer(pois); return; }
+    if (pois.length) { addPOILayer(mergeManualVerifiedPois(pois)); return; }
     throw new Error('Overpass devolvió 0 resultados');
   } catch (err) {
     console.warn('Ningún espejo de Overpass respondió, se busca un resultado en caché:', err);
     try {
       const cached = JSON.parse(localStorage.getItem(POI_CACHE_KEY) || 'null');
-      if (cached && cached.pois && cached.pois.length) { addPOILayer(cached.pois); return; }
+      if (cached && cached.pois && cached.pois.length) { addPOILayer(mergeManualVerifiedPois(cached.pois)); return; }
     } catch (e) { /* caché corrupta o no disponible, se ignora */ }
-    console.warn('Tampoco hay caché disponible, se usa el respaldo mínimo (solo Salamanca centro).');
-    addPOILayer(POI_PLACES);
+    console.warn('Tampoco hay caché disponible, se usa el respaldo mínimo + los verificados manualmente.');
+    addPOILayer(mergeManualVerifiedPois(POI_PLACES));
   }
 }
 
