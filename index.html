@@ -925,7 +925,6 @@ const LOCATIONS = [
   { name: 'Copec Sector Sali, Salamanca',                 coord: [-70.9800, -31.7751] },
   { name: 'Farmacia Jarufe, Salamanca',                   coord: [-70.9645, -31.7784] },
   { name: 'Cruz Verde, Matilde Salamanca',                coord: [-70.9646, -31.7790] },
-  { name: 'Estadio Municipal N°1, Salamanca',             coord: [-70.9650, -31.7770] },
   { name: 'Colliguay, Salamanca',                         coord: GEO.colliguay },
   { name: 'El Tambo, Salamanca',                          coord: GEO.elTambo },
   { name: 'Chalinga, Salamanca', coord: GEO.chalinga },
@@ -1514,11 +1513,10 @@ function setPOIRouteEmphasis(active) {
    del todo), estos SIEMPRE se agregan al resultado — si no, en el uso
    normal (Overpass respondiendo bien) nunca llegarían a verse. */
 const MANUAL_VERIFIED_POIS = [
-  { name: 'Estadio Municipal de Salamanca', category: 'stadium', coord: [-70.970128, -31.783034] },
-  { name: 'IEP El Tambo',               category: 'church',     coord: [-71.0226152, -31.7860923] },
   { name: 'Colegio Tahuinco',           category: 'school',     coord: [-71.0571533, -31.7906912] },
   { name: 'Almacén Flores, Colliguay',  category: 'market',     coord: [-71.016759, -31.8236639] },
-  { name: 'Sofit Gimnasio Salamanca',   category: 'gym',        coord: [-70.9613, -31.7824] }
+  { name: 'Sofit Gimnasio Salamanca',   category: 'gym',        coord: [-70.96712614963643, -31.78004022864742] },
+  { name: 'Gimnasio Municipal',         category: 'gym',        coord: [-70.9637866171898, -31.77649416068062] }
 ];
 
 function mergeManualVerifiedPois(pois) {
