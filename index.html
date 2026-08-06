@@ -944,7 +944,8 @@ const POI_ICONS = {
   market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16l-1.5 11a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8L4 8z" stroke-linejoin="round"/><path d="M8 8V6a4 4 0 0 1 8 0v2" stroke-linecap="round"/></svg>',
   pharmacy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
   bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M4 10v9M8 10v9M12 10v9M16 10v9M20 10v9M2 21h20" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>',
+  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>', 
+  stadium: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.3 2.4-1.25 3.9H9.95L8.7 9.6 12 7.2z" stroke-linejoin="round"/><path d="M12 3.2v4M4 9.4l3.6.9M20 9.4l-3.6.9M6.7 19.3l2.1-3.7M17.3 19.3l-2.1-3.7" stroke-linecap="round"/></svg>',   
   church: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
   school: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3L2 8l10 5 10-5-10-5z" stroke-linejoin="round"/><path d="M6 10.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-5.5" stroke-linejoin="round"/></svg>',
   /* Localidades/sectores rurales (place=hamlet|village|town|locality en
@@ -971,6 +972,10 @@ const POI_PLACES = [
   { name: 'Supermercado Piolín',        category: 'market',     coord: [-70.9633, -31.7822] },
   { name: 'Farmacia Jarufe',            category: 'pharmacy',   coord: [-70.9645, -31.7784] },
   { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] },
+  /* Estadio Municipal de Salamanca (El Aquelarre) — José Manuel Infante
+     alt. 486. Coordenada verificada en OpenStreetMap (way 89568616,
+     leisure=pitch, sport=soccer). */
+  { name: 'Estadio Municipal de Salamanca', category: 'stadium', coord: [-70.970128, -31.783034] },
   /* POI rurales del valle, verificados por el usuario vía enlace de
      Google Maps (coordenadas reales del pin, no aproximadas). */
   { name: 'IEP El Tambo',               category: 'church',     coord: [-71.0226152, -31.7860923] },
@@ -1062,7 +1067,8 @@ const POI_NAME_BLACKLIST = [
   'Las Cañas de Michío', 'Quebrada de Llapín', 'Quebrada de Michío',
   'Cabrería', 'Lanco Alto', 'El Rincón', 'Moraleda', 'Punta Nueva',
   'Población Nuevo Barrio Alto', 'Manquehua', 'Las Jarillas', 'Quelén Alto Sur',
-  'Escuela Manquehua', 'Escuela Las Jarillas', 'Escuela El Rincón', 'Escuela Cañas de Michío'
+  'Escuela Manquehua', 'Escuela Las Jarillas', 'Escuela El Rincón', 'Escuela Cañas de Michío',
+  'Punto', 'Intercomunal'
 ].map(normalize);
 
 async function fetchOSMPOIs() {
@@ -1153,7 +1159,7 @@ const POI_CATEGORY_PRIORITY = {
   // que un banco o un supermercado.
   locality:-1,
   health:0, pharmacy:1, firestation:2, government:3, bank:4,
-  transport:5, market:6, landmark:7, church:8, school:9, community:9, fuel:6
+  transport:5, market:6, landmark:7, church:8, school:9, community:9, fuel:6, stadium:7
 };
 
 // Tope subido de 20 a 45: antes cubría en la práctica solo el centro de
@@ -1380,7 +1386,7 @@ function addPOILayer(rawPois) {
      interpolate completos, se usa UN solo interpolate de zoom y, en cada
      parada, un "match" que decide el tamaño según la categoría. */
   const isEssentialSize = ['match', ['get', 'category'],
-    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel'], true, false
+    ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel', 'stadium'], true, false
   ];
   const sizeExpr = ['interpolate', ['linear'], ['zoom'],
     11, ['case', isEssentialSize, 0.46, 0.36],
@@ -1406,7 +1412,7 @@ function addPOILayer(rawPois) {
      referentes en localidades rurales (El Tambo, Tahuinco) — ahí no hay
      "ruido" de otros POI con los que compitan, así que conviene que su
      nombre aparezca ya en zoom medio. */
-  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel'];
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation', 'church', 'school', 'locality', 'community', 'fuel', 'stadium'];
   const iconOpacityExpr = ['interpolate', ['linear'], ['zoom'],
     11,   ['case', isEssentialSize, 0.75, 0],
     12.8, ['case', isEssentialSize, 0.8,  0],
