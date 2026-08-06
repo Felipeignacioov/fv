@@ -423,6 +423,45 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 .save-suggest button{ font-family:inherit; font-size:11px; font-weight:700; padding:6px 11px; border-radius:8px; cursor:pointer; border:none; }
 #saveSuggestYes{ background:linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%); color:#06120D; }
 #saveSuggestNo{ background:transparent; color:var(--text-tertiary); }
+/* Pin fijo estilo Google Maps: vive en el centro exacto de la pantalla
+   (no es un Marker de MapLibre, es overlay de HTML puro) — el usuario
+   mueve el MAPA debajo, no el pin. pointer-events:none para que el
+   arrastre del mapa no quede bloqueado por el pin. */
+.place-pick-pin-fixed{
+  position:fixed; left:50%; top:50%; z-index:14; pointer-events:none;
+  width:26px; height:34px; margin-left:-13px; margin-top:-33px;
+  opacity:0; transition: opacity .25s ease;
+}
+.place-pick-pin-fixed.show{ opacity:1; }
+.place-pick-pin-icon{
+  width:100%; height:100%; position:relative; z-index:2; display:block;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,0.4));
+  transform-origin:50% 100%;
+  transition: transform .18s ease-out;
+}
+/* Mientras el mapa se está arrastrando: el pin se eleva y su sombra se
+   achica/atenúa (misma sensación que Google Maps al soltar un pin). */
+.place-pick-pin-fixed.lifting .place-pick-pin-icon{ transform: translateY(-10px); }
+.place-pick-pin-shadow{
+  position:absolute; left:50%; bottom:-1px; width:12px; height:4px; margin-left:-6px; border-radius:50%;
+  background:rgba(0,0,0,0.35); filter:blur(1.5px); z-index:1;
+  transition: transform .18s ease-out, opacity .18s ease-out;
+}
+.place-pick-pin-fixed.lifting .place-pick-pin-shadow{ transform: scale(0.55); opacity:0.5; }
+/* Al soltar (moveend): el pin cae con un pequeño rebote y aparece la
+   onda verde esmeralda — la clase .dropped se re-dispara cada vez que
+   el mapa se detiene, así la animación se repite en cada movimiento. */
+.place-pick-pin-fixed.dropped .place-pick-pin-icon{ animation: pinDropBounce .4s cubic-bezier(.34,1.56,.64,1) both; }
+@keyframes pinDropBounce{ 0%{ transform:translateY(-10px);} 60%{ transform:translateY(2px);} 100%{ transform:translateY(0);} }
+.place-pick-pin-ripple{
+  position:absolute; left:50%; bottom:0; width:14px; height:14px; margin-left:-7px; border-radius:50%;
+  border:1.5px solid var(--accent-2); opacity:0; z-index:1;
+}
+.place-pick-pin-fixed.dropped .place-pick-pin-ripple{ animation: pinDropRipple .55s cubic-bezier(.16,1,.3,1) both; }
+@keyframes pinDropRipple{ 0%{ transform:scale(.4); opacity:.8;} 100%{ transform:scale(3.2); opacity:0;} }
+
+#placePickSave{ background:linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%); color:#06120D; border-color:transparent; }
+#placePickSave:disabled{ background:rgba(255,255,255,0.06); color:var(--text-tertiary); cursor:not-allowed; opacity:.6; }
 .place-pick-banner{
   position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:32;
   display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px;
@@ -690,6 +729,14 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
 <div class="map-grain"></div>
 <div class="map-atmosphere"></div>
 <div class="sheet-scrim"></div>
+<div class="place-pick-pin-fixed" id="placePickPinFixed">
+  <div class="place-pick-pin-shadow"></div>
+  <svg class="place-pick-pin-icon" viewBox="0 0 26 34" fill="none">
+    <path d="M13 33C13 33 25 19.7 25 13C25 5.8 19.6 0 13 0C6.4 0 1 5.8 1 13C1 19.7 13 33 13 33Z" fill="#ffffff" stroke="#059669" stroke-width="1.4"/>
+    <circle cx="13" cy="13" r="5" fill="#059669"/>
+  </svg>
+  <div class="place-pick-pin-ripple" id="placePickPinRipple"></div>
+</div>
 <div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
   <div class="success-toast" id="successToast">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 12l5 5L20 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -701,8 +748,9 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
   <button id="saveSuggestNo">Ahora no</button>
 </div>
  <div class="place-pick-banner" id="placePickBanner">
-  <span>Busca y toca la ubicación exacta en el mapa</span>
+  <span id="placePickBannerText">Mueve el mapa para ubicar el pin</span>
   <button id="placePickCancel">Cancelar</button>
+  <button id="placePickSave" disabled>Guardar aquí</button>
 </div>
 <div class="map-loading" id="mapLoading">
   <div class="map-loading-spinner"></div>
@@ -924,12 +972,9 @@ const LOCATIONS = [
   { name: 'Copec O\'Higgins, Salamanca',                  coord: [-70.9637, -31.7801] },
   { name: 'Copec Sector Sali, Salamanca',                 coord: [-70.9800, -31.7751] },
   { name: 'Farmacia Jarufe, Salamanca',                   coord: [-70.9645, -31.7784] },
-  { name: 'Cruz Verde, Matilde Salamanca',                coord: [-70.9646, -31.7790] },
   { name: 'Colliguay, Salamanca',                         coord: GEO.colliguay },
   { name: 'El Tambo, Salamanca',                          coord: GEO.elTambo },
   { name: 'Chalinga, Salamanca', coord: GEO.chalinga },
- { name: 'Sofit Gimnasio Salamanca',   category: 'gym', coord: [-70.96777507077472, -31.780139413641947] }, 
-  { name: 'IEP El Tambo', coord: [-71.0226152, -31.7860923] },
   { name: 'Colegio Tahuinco', coord: [-71.0571533, -31.7906912] },
   { name: 'Almacén Flores, Colliguay', coord: [-71.016759, -31.8236639] }
 ];
@@ -2653,40 +2698,42 @@ if (!savedPlaces.favorites) savedPlaces.favorites = [];
    snapToRoad/OSRM que usa el resto de la app), aparece un pin temporal,
    y solo se pide el nombre para confirmar y guardar. */
 let placePickingMode = null; // { slotId, slotLabel, iconId }
-let placePickingPin = null;
 
 function startPlacePicking(slotId, slotLabel) {
   if (placePickingMode) return;
   placePickingMode = { slotId, slotLabel, iconId: USER_PLACE_ICON_BY_SLOT[slotId] || 'userfavorite' };
   fromList.classList.remove('show'); toList.classList.remove('show');
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-  setSheet('collapsed'); // deja ver el mapa casi completo para elegir el punto
+  setSheet('collapsed'); // deja ver el mapa casi completo para mover el pin
   const banner = document.getElementById('placePickBanner');
+  const bannerText = document.getElementById('placePickBannerText');
+  const saveBtn = document.getElementById('placePickSave');
+  const pin = document.getElementById('placePickPinFixed');
+  if (bannerText) bannerText.textContent = 'Mueve el mapa para ubicar el pin';
+  // "Guardar" solo se habilita después de que el mapa se detenga al
+  // menos una vez (moveend) — nunca antes, tal como se pidió.
+  if (saveBtn) saveBtn.disabled = true;
   if (banner) banner.classList.add('show');
+  if (pin) pin.classList.add('show');
 }
 
 function cancelPlacePicking() {
   placePickingMode = null;
-  if (placePickingPin) { placePickingPin.remove(); placePickingPin = null; }
   const banner = document.getElementById('placePickBanner');
   if (banner) banner.classList.remove('show');
+  const pin = document.getElementById('placePickPinFixed');
+  if (pin) pin.classList.remove('show', 'lifting', 'dropped');
 }
 
-async function confirmPlacePicking(lngLat) {
+/* Ya no se confirma tocando el mapa: la ubicación es siempre el centro
+   exacto de la pantalla (donde está el pin fijo), y se confirma con el
+   botón "Guardar aquí" del banner — igual que arrastrar el mapa en
+   Google Maps para ubicar un pin. */
+async function confirmPlacePicking() {
   const mode = placePickingMode;
   if (!mode) return;
-  const snapped = await snapToRoad([lngLat.lng, lngLat.lat]);
-
-  // Pin temporal (reutiliza el mismo diseño/halo animado de .pin-dest,
-  // solo con el acento en ámbar) mientras se confirma el nombre.
-  const el = document.createElement('div');
-  el.className = 'pin-dest';
-  el.innerHTML = `<div class="dest-halo"></div><svg viewBox="0 0 26 34" fill="none">
-      <path d="M13 33C13 33 25 19.7 25 13C25 5.8 19.6 0 13 0C6.4 0 1 5.8 1 13C1 19.7 13 33 13 33Z" fill="#ffffff" stroke="#E8A63C" stroke-width="1.4"/>
-      <circle cx="13" cy="13" r="5" fill="#E8A63C"/>
-    </svg>`;
-  if (placePickingPin) placePickingPin.remove();
-  placePickingPin = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat(snapped).addTo(map);
+  const center = map.getCenter();
+  const snapped = await snapToRoad([center.lng, center.lat]);
 
   // Casa/Trabajo/Gimnasio ya tienen su nombre fijo por defecto — solo se
   // pregunta cuando es un Favorito nuevo (ahí sí hace falta un nombre).
@@ -2702,7 +2749,7 @@ async function confirmPlacePicking(lngLat) {
   // TODO: cuando esté disponible Supabase, este objeto (name, coord,
   // icon) es exactamente lo que hay que insertar en la tabla de lugares
   // guardados del usuario — la forma de los datos ya queda lista.
-  const place = { name: name.trim(), coord: snapped, icon: mode.iconId };
+  const place = { name, coord: snapped, icon: mode.iconId };
   if (mode.slotId === 'favorite') {
     place.id = 'fav_' + Date.now();
     savedPlaces.favorites.push(place);
@@ -2715,7 +2762,32 @@ async function confirmPlacePicking(lngLat) {
   cancelPlacePicking();
 }
 
+// Mientras se arrastra el mapa en modo selección, el pin se eleva y
+// "Guardar" se deshabilita; al soltar (moveend), el pin cae con rebote +
+// onda verde y "Guardar" vuelve a habilitarse — esa caída es justo la
+// señal visual de "ubicación seleccionada" que se pidió.
+map.on('movestart', () => {
+  if (!placePickingMode) return;
+  const pin = document.getElementById('placePickPinFixed');
+  const saveBtn = document.getElementById('placePickSave');
+  if (pin) { pin.classList.remove('dropped'); pin.classList.add('lifting'); }
+  if (saveBtn) saveBtn.disabled = true;
+});
+map.on('moveend', () => {
+  if (!placePickingMode) return;
+  const pin = document.getElementById('placePickPinFixed');
+  const saveBtn = document.getElementById('placePickSave');
+  if (pin) {
+    pin.classList.remove('lifting');
+    pin.classList.remove('dropped');
+    void pin.offsetWidth; // fuerza un reflow para poder re-disparar la misma animación cada vez
+    pin.classList.add('dropped');
+  }
+  if (saveBtn) saveBtn.disabled = false;
+});
+
 document.getElementById('placePickCancel').addEventListener('click', (e) => { e.stopPropagation(); cancelPlacePicking(); });
+document.getElementById('placePickSave').addEventListener('click', (e) => { e.stopPropagation(); confirmPlacePicking(); });
 
 function renderSavedPlacesChips(list, onSelect, input) {
   const header = document.createElement('div');
@@ -2999,9 +3071,9 @@ function showMapRipple(point) {
   setTimeout(() => el.remove(), 480);
 }
 map.on('click', (e) => {
-  // El modo de selección de lugar guardado tiene prioridad sobre
-  // cualquier otra interacción del mapa mientras está activo.
-  if (placePickingMode) { confirmPlacePicking(e.lngLat); return; }
+  // En modo de selección de lugar guardado, tocar/arrastrar el mapa solo
+  // debe moverlo — nunca disparar otra interacción (POI, destino, etc.).
+  if (placePickingMode) return;
 
   // Si el toque cayó sobre un POI (público o guardado), esa interacción
   // ya la resuelve el listener de addPOILayer (selectPOI) — este otro
