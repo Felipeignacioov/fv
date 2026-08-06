@@ -462,6 +462,47 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 
 #placePickSave{ background:linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%); color:#06120D; border-color:transparent; }
 #placePickSave:disabled{ background:rgba(255,255,255,0.06); color:var(--text-tertiary); cursor:not-allowed; opacity:.6; }
+/* ---------- Menú de un lugar personal (Casa/Trabajo/Gimnasio/Favorito) ----------
+   Solo se dispara al tocar un ícono de user-places-layer — nunca en un
+   POI público. */
+.user-place-overlay{
+  position:fixed; inset:0; z-index:45; display:flex; align-items:flex-end; justify-content:center;
+  background:rgba(6,8,11,0.5); backdrop-filter: blur(6px);
+  opacity:0; pointer-events:none; transition: opacity .3s ease;
+}
+.user-place-overlay.show{ opacity:1; pointer-events:auto; }
+.user-place-card, .user-place-confirm{
+  width:100%; max-width:360px; margin:0 16px 16px; padding:14px;
+  transform: translateY(16px); opacity:0; transition: transform .35s cubic-bezier(.16,1,.3,1), opacity .3s ease;
+}
+.user-place-overlay.show .user-place-card,
+.user-place-overlay.show .user-place-confirm{ transform: translateY(0); opacity:1; }
+.user-place-confirm{ display:none; }
+.user-place-overlay.confirming .user-place-card{ display:none; }
+.user-place-overlay.confirming .user-place-confirm{ display:block; }
+
+.user-place-head{ display:flex; align-items:center; gap:10px; padding:4px 6px 14px; border-bottom:1px solid var(--border-glass); margin-bottom:6px; }
+.user-place-head-icon{ width:32px; height:32px; border-radius:50%; background:rgba(232,196,140,0.12); border:1px solid rgba(232,196,140,0.3); display:flex; align-items:center; justify-content:center; color:#E8C48C; flex-shrink:0; }
+.user-place-head-icon svg{ width:16px; height:16px; }
+.user-place-head-name{ font-family:'Manrope',sans-serif; font-weight:700; font-size:14px; }
+
+.user-place-action{
+  width:100%; display:flex; align-items:center; gap:10px; padding:12px 8px; border-radius:10px;
+  border:none; background:transparent; color:var(--text-primary); font-family:inherit; font-size:12.5px; font-weight:600;
+  cursor:pointer; text-align:left; transition: background .15s ease;
+}
+.user-place-action svg{ width:15px; height:15px; color:var(--text-secondary); flex-shrink:0; }
+.user-place-action:active{ background:rgba(255,255,255,0.05); }
+@media (hover:hover) and (pointer:fine){ .user-place-action:hover{ background:rgba(255,255,255,0.05); } }
+.user-place-action.danger{ color:#ffb3ab; }
+.user-place-action.danger svg{ color:#ffb3ab; }
+.user-place-action.cancel{ color:var(--text-tertiary); justify-content:center; margin-top:4px; border-top:1px solid var(--border-glass); border-radius:0; padding-top:14px; }
+
+.upc-text{ font-size:12.5px; font-weight:600; color:var(--text-primary); text-align:center; padding:8px 4px 16px; line-height:1.4; }
+.upc-row{ display:flex; gap:8px; }
+.upc-row button{ flex:1; padding:10px; border-radius:10px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; border:none; }
+#upcCancel{ background:rgba(255,255,255,0.06); color:var(--text-secondary); }
+#upcDelete{ background:linear-gradient(150deg, #C4453B, #8F2F28); color:#FFEDEC; }
 .place-pick-banner{
   position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:32;
   display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:14px;
@@ -751,6 +792,38 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
   <span id="placePickBannerText">Mueve el mapa para ubicar el pin</span>
   <button id="placePickCancel">Cancelar</button>
   <button id="placePickSave" disabled>Guardar aquí</button>
+</div>
+<div class="user-place-overlay" id="userPlaceOverlay">
+  <div class="panel user-place-card" id="userPlaceMenu">
+    <div class="user-place-head">
+      <div class="user-place-head-icon" id="userPlaceHeadIcon"></div>
+      <div class="user-place-head-name" id="userPlaceHeadName">Casa</div>
+    </div>
+    <button class="user-place-action" id="upaGoHere">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Ir aquí</span>
+    </button>
+    <button class="user-place-action" id="upaEditName">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9" stroke-linecap="round"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" stroke-linejoin="round"/></svg>
+      <span>Editar nombre</span>
+    </button>
+    <button class="user-place-action" id="upaChangeLocation">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.4"/></svg>
+      <span>Cambiar ubicación</span>
+    </button>
+    <button class="user-place-action danger" id="upaDelete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Eliminar</span>
+    </button>
+    <button class="user-place-action cancel" id="upaCancel"><span>Cancelar</span></button>
+  </div>
+  <div class="panel user-place-confirm" id="userPlaceConfirm">
+    <div class="upc-text" id="upcText">¿Eliminar este lugar?</div>
+    <div class="upc-row">
+      <button id="upcCancel">Cancelar</button>
+      <button id="upcDelete">Eliminar</button>
+    </div>
+  </div>
 </div>
 <div class="map-loading" id="mapLoading">
   <div class="map-loading-spinner"></div>
@@ -1519,8 +1592,16 @@ function addPOILayer(rawPois) {
 
  map.on('click', (e) => {
     const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer', 'user-places-layer'] });
-    if (features.length) selectPOI(features[0]);
-    else clearPoiSelection();
+    if (!features.length) { clearPoiSelection(); return; }
+    const feature = features[0];
+    // Un lugar personal abre su propio menú (Ir aquí/Editar/Cambiar
+    // ubicación/Eliminar) en vez del popup genérico de "Usar como
+    // destino" que usan los POI públicos.
+    if (feature.layer && feature.layer.id === 'user-places-layer') {
+      openUserPlaceMenu(feature);
+    } else {
+      selectPOI(feature);
+    }
   });
   ['poi-layer', 'poi-selected-layer', 'user-places-layer'].forEach(id => {
     map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -2698,9 +2779,9 @@ if (!savedPlaces.favorites) savedPlaces.favorites = [];
    y solo se pide el nombre para confirmar y guardar. */
 let placePickingMode = null; // { slotId, slotLabel, iconId }
 
-function startPlacePicking(slotId, slotLabel) {
+function startPlacePicking(slotId, slotLabel, editFavoriteId) {
   if (placePickingMode) return;
-  placePickingMode = { slotId, slotLabel, iconId: USER_PLACE_ICON_BY_SLOT[slotId] || 'userfavorite' };
+  placePickingMode = { slotId, slotLabel, iconId: USER_PLACE_ICON_BY_SLOT[slotId] || 'userfavorite', editFavoriteId: editFavoriteId || null };
   fromList.classList.remove('show'); toList.classList.remove('show');
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   setSheet('collapsed'); // deja ver el mapa casi completo para mover el pin
@@ -2733,6 +2814,18 @@ async function confirmPlacePicking() {
   if (!mode) return;
   const center = map.getCenter();
   const snapped = await snapToRoad([center.lng, center.lat]);
+
+  // "Cambiar ubicación" de un lugar ya existente: solo se actualiza la
+  // coordenada, el nombre no se toca ni se vuelve a preguntar.
+  if (mode.editFavoriteId) {
+    const idx = savedPlaces.favorites.findIndex(f => f.id === mode.editFavoriteId);
+    if (idx !== -1) savedPlaces.favorites[idx] = { ...savedPlaces.favorites[idx], coord: snapped };
+    persistSavedPlaces();
+    refreshUserPlacesLayer();
+    showSuccessToast('Ubicación actualizada');
+    cancelPlacePicking();
+    return;
+  }
 
   // Casa/Trabajo/Gimnasio ya tienen su nombre fijo por defecto — solo se
   // pregunta cuando es un Favorito nuevo (ahí sí hace falta un nombre).
@@ -2928,14 +3021,14 @@ function ensureUserPlaceIcons() {
    filtro de zoom — son pocos y son del usuario, no deberían "esconderse". */
 function userPlacesToGeoJSON() {
   const list = [];
-  ['home', 'work', 'gym'].forEach(key => { if (savedPlaces[key]) list.push(savedPlaces[key]); });
-  savedPlaces.favorites.forEach(f => list.push(f));
+  ['home', 'work', 'gym'].forEach(key => { if (savedPlaces[key]) list.push({ ...savedPlaces[key], placeKey: key }); });
+  savedPlaces.favorites.forEach(f => list.push({ ...f, placeKey: f.id }));
   return {
     type: 'FeatureCollection',
     features: list.map((p, i) => ({
       type: 'Feature', id: 'user-' + i,
       geometry: { type: 'Point', coordinates: p.coord },
-      properties: { name: p.name, category: p.icon || 'userfavorite' }
+      properties: { name: p.name, category: p.icon || 'userfavorite', placeKey: p.placeKey }
     }))
   };
 }
@@ -2957,7 +3050,97 @@ function refreshUserPlacesLayer() {
     paint: { 'text-color': '#F3DBAE', 'text-halo-color': 'rgba(6,9,12,0.85)', 'text-halo-width': 1 }
   });
 }
+/* ---------- Menú del lugar personal ---------- */
+let activeUserPlaceFeature = null;
 
+function findSavedPlaceByKey(key) {
+  if (key === 'home' || key === 'work' || key === 'gym') {
+    return { obj: savedPlaces[key], setter: (v) => { savedPlaces[key] = v; } };
+  }
+  const idx = savedPlaces.favorites.findIndex(f => f.id === key);
+  if (idx === -1) return null;
+  return { obj: savedPlaces.favorites[idx], setter: (v) => { savedPlaces.favorites[idx] = v; } };
+}
+
+function openUserPlaceMenu(feature) {
+  activeUserPlaceFeature = feature;
+  const overlay = document.getElementById('userPlaceOverlay');
+  const headIcon = document.getElementById('userPlaceHeadIcon');
+  const headName = document.getElementById('userPlaceHeadName');
+  headIcon.innerHTML = USER_PLACE_ICONS[feature.properties.category] || USER_PLACE_ICONS.userfavorite;
+  headName.textContent = feature.properties.name;
+  overlay.classList.remove('confirming');
+  overlay.classList.add('show');
+}
+function closeUserPlaceMenu() {
+  document.getElementById('userPlaceOverlay').classList.remove('show', 'confirming');
+  activeUserPlaceFeature = null;
+}
+
+document.getElementById('upaGoHere').addEventListener('click', () => {
+  if (!activeUserPlaceFeature) return;
+  if (busy) { showToast('Finaliza o cancela tu viaje actual para elegir otro destino'); closeUserPlaceMenu(); return; }
+  const coords = activeUserPlaceFeature.geometry.coordinates.slice();
+  const name = activeUserPlaceFeature.properties.name;
+  currentDestination = { name, coord: coords };
+  toText.value = name;
+  rebuildTrip();
+  if (window.innerWidth <= 880) setSheet('mid');
+  closeUserPlaceMenu();
+});
+
+document.getElementById('upaEditName').addEventListener('click', () => {
+  if (!activeUserPlaceFeature) return;
+  const found = findSavedPlaceByKey(activeUserPlaceFeature.properties.placeKey);
+  if (!found || !found.obj) { closeUserPlaceMenu(); return; }
+  const typed = window.prompt('Nuevo nombre:', found.obj.name);
+  if (!typed || !typed.trim()) return;
+  found.setter({ ...found.obj, name: typed.trim() });
+  persistSavedPlaces();
+  refreshUserPlacesLayer();
+  showSuccessToast('Nombre actualizado');
+  closeUserPlaceMenu();
+});
+
+document.getElementById('upaChangeLocation').addEventListener('click', () => {
+  if (!activeUserPlaceFeature) return;
+  const key = activeUserPlaceFeature.properties.placeKey;
+  const isSlot = key === 'home' || key === 'work' || key === 'gym';
+  const slotLabel = isSlot ? (DEFAULT_SAVED_SLOTS.find(s => s.id === key) || {}).label : null;
+  closeUserPlaceMenu();
+  startPlacePicking(isSlot ? key : 'favorite', slotLabel, isSlot ? null : key);
+});
+
+document.getElementById('upaDelete').addEventListener('click', () => {
+  if (!activeUserPlaceFeature) return;
+  document.getElementById('upcText').textContent = `¿Eliminar "${activeUserPlaceFeature.properties.name}"?`;
+  document.getElementById('userPlaceOverlay').classList.add('confirming');
+});
+document.getElementById('upcCancel').addEventListener('click', () => {
+  document.getElementById('userPlaceOverlay').classList.remove('confirming');
+});
+document.getElementById('upcDelete').addEventListener('click', () => {
+  if (!activeUserPlaceFeature) return;
+  const key = activeUserPlaceFeature.properties.placeKey;
+  if (key === 'home' || key === 'work' || key === 'gym') {
+    delete savedPlaces[key];
+  } else {
+    const idx = savedPlaces.favorites.findIndex(f => f.id === key);
+    if (idx !== -1) savedPlaces.favorites.splice(idx, 1);
+  }
+  persistSavedPlaces();
+  refreshUserPlacesLayer();
+  showSuccessToast('Lugar eliminado');
+  closeUserPlaceMenu();
+});
+document.getElementById('upaCancel').addEventListener('click', closeUserPlaceMenu);
+document.getElementById('userPlaceOverlay').addEventListener('click', (e) => {
+  if (e.target !== e.currentTarget) return;
+  const overlay = document.getElementById('userPlaceOverlay');
+  if (overlay.classList.contains('confirming')) overlay.classList.remove('confirming');
+  else closeUserPlaceMenu();
+});
+     
 function renderList(list, results, onSelect, input, isDefault, showSaved) {  
   list.innerHTML = '';
   if (showSaved) renderSavedPlacesChips(list, onSelect, input);
