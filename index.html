@@ -2665,10 +2665,6 @@ async function rebuildTrip(animate = true) {
     originMarker.setLngLat(originSnapped);
     destMarker.setLngLat(currentDestination.coord);
     carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
-  } else {
-    originMarker.setLngLat(originSnapped);
-    destMarker.setLngLat(destSnapped);
-    carMarker.setLngLat(ROUTE_LINE[0] || originSnapped);
   }
  /* El auto queda estático en el punto de recogida (ya posicionado más
      arriba con carMarker.setLngLat) hasta que el usuario solicite el
