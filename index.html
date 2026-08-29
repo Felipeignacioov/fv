@@ -1162,6 +1162,7 @@ function addRouteLayers() {
     const v = 0.2 + Math.sin(breatheT) * 0.04;
     if (map.getLayer('route-glow')) map.setPaintProperty('route-glow', 'line-opacity', v);
   }, 100);
+}
 
 async function buildRoute(origin, destination) {
   try {
