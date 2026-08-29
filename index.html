@@ -49,7 +49,7 @@ body{
 .mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
 .display{ font-family:'Manrope','Inter',sans-serif; }
 button{ font-family:inherit; }
-button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-cta, .ac-item, .poi-popup-btn, .request-btn{
+button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-cta, .ac-item, .poi-marker, .request-btn{
   touch-action: manipulation;
 }
 
@@ -122,38 +122,36 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 @keyframes carFloat{ 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-1px);} }
 @keyframes carHalo{ 0%,100%{ opacity:.6; transform:scale(1);} 50%{ opacity:.9; transform:scale(1.06);} }
 
-/* --- Puntos de interés (POI) reales de Salamanca ---
-   Los POI ya NO son marcadores HTML (maplibregl.Marker): se renderizan
-   como una GeoJSON Source + SymbolLayer nativa del motor WebGL de
-   MapLibre (ver sección D2 del script), igual que las calles y las
-   etiquetas. Esto garantiza que su posición sea siempre exacta, tanto en
-   escritorio como en móvil, sin depender de la sincronización del DOM.
-   Lo único que sigue siendo HTML es el contenido del popup al tocar un
-   POI (nombre + botón "Usar como destino"), mostrado con
-   maplibregl.Popup — que también se posiciona vía la proyección nativa
-   del mapa. */
-.maplibregl-popup.poi-popup-wrap{ z-index:8; }
-.maplibregl-popup.poi-popup-wrap .maplibregl-popup-content{
-  background: rgba(13,17,22,0.94); border:1px solid var(--border-glass-strong);
-  border-radius:12px; padding:10px 12px 11px; box-shadow:0 16px 36px rgba(0,0,0,0.45);
-  backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+/* --- Puntos de interés (POI) reales de Salamanca --- */
+.poi-marker{
+  width:23px; height:23px; border-radius:50%; position:relative; cursor:pointer;
+  background: linear-gradient(160deg, rgba(20,26,22,0.82), rgba(11,15,13,0.82));
+  border:1px solid rgba(16,185,129,0.32);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 3px 9px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05);
+  backdrop-filter: blur(8px) saturate(150%); -webkit-backdrop-filter: blur(8px) saturate(150%);
+  transition: opacity .35s cubic-bezier(.16,1,.3,1), transform .2s cubic-bezier(.16,1,.3,1), border-color .2s ease, box-shadow .2s ease;
+  opacity:1;
 }
-.maplibregl-popup.poi-popup-wrap .maplibregl-popup-tip{
-  border-top-color: rgba(13,17,22,0.94) !important; border-bottom-color: rgba(13,17,22,0.94) !important;
-}
-.poi-popup-name{ font-size:11.5px; font-weight:700; color:var(--text-primary); margin-bottom:8px; max-width:180px; line-height:1.3; }
-.poi-popup-btn{
-  display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:7px 10px;
-  border-radius:8px; border:1px solid rgba(16,185,129,0.32);
-  background:linear-gradient(150deg, rgba(5,150,105,0.22), rgba(5,150,105,0.08));
-  color:#CFF7F1; font-size:11px; font-weight:600; font-family:inherit; cursor:pointer;
-  transition: background .2s ease, transform .12s ease;
-}
-.poi-popup-btn svg{ width:11px; height:11px; }
-.poi-popup-btn:active{ transform:scale(.96); background:linear-gradient(150deg, rgba(5,150,105,0.32), rgba(5,150,105,0.14)); }
+/* Oculto por defecto hasta que el JS confirme que MapLibre ya proyectó el
+   marcador dentro de los límites reales del contenedor (ver
+   revealVerifiedMarkers en el script). Nunca se revela por tiempo, solo
+   cuando la posición quedó verificada. */
+.poi-marker-pending{ opacity:0 !important; transform:scale(.82); pointer-events:none; }
+.poi-marker svg{ width:11px; height:11px; color:#10B981; opacity:.92; }
+.poi-marker:active{ transform:scale(1.22); border-color:rgba(16,185,129,0.75); box-shadow:0 4px 12px rgba(0,0,0,0.45), 0 0 10px rgba(16,185,129,0.3); z-index:6; }
 @media (hover:hover) and (pointer:fine){
-  .poi-popup-btn:hover{ background:linear-gradient(150deg, rgba(5,150,105,0.3), rgba(5,150,105,0.12)); }
+  .poi-marker:hover{ transform:scale(1.22); border-color:rgba(16,185,129,0.75); box-shadow:0 4px 12px rgba(0,0,0,0.45), 0 0 10px rgba(16,185,129,0.3); z-index:6; }
+  .poi-marker:hover .poi-tip{ opacity:1; transform:translateX(-50%) translateY(0); }
 }
+.poi-tip{
+  position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%) translateY(3px);
+  background:rgba(10,13,17,0.94); border:1px solid var(--border-glass-strong); color:var(--text-primary);
+  font-size:10px; font-weight:600; padding:5px 9px; border-radius:7px; white-space:nowrap;
+  opacity:0; pointer-events:none; transition: opacity .18s ease, transform .18s ease;
+  box-shadow:0 8px 18px rgba(0,0,0,0.4); letter-spacing:.005em;
+}
+.poi-tip.show-tip{ opacity:1; transform:translateX(-50%) translateY(0); }
 
 /* =====================================================================
    4) UI OVERLAY
@@ -255,23 +253,19 @@ button, a, .icon-btn, .help-pill, .swap-btn, .service-opt, .contact-btn, .peek-c
 .estimate-card.price .evalue{ color:var(--accent-2); text-shadow:0 0 10px rgba(16,185,129,0.22); }
 
 .request-btn{
-margin-top:14px; width:100%; padding:16px; border-radius:16px; cursor:pointer;
-border:1px solid rgba(16,185,129,0.4);
-background: linear-gradient(150deg, var(--accent-2), var(--accent-1) 78%);
-color:#06120D; font-weight:800; font-size:14.5px; letter-spacing:.01em;
-display:flex; align-items:center; justify-content:center; gap:8px;
-transition: transform .15s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
-box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.18);
+  margin-top:13px; width:100%; padding:13px; border-radius:12px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(150deg, #1B222A, #0F1418 75%);
+  color:#F5F7F9; font-weight:600; font-size:13px; letter-spacing:.01em;
+  transition: transform .15s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
+  box-shadow:0 6px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06);
 }
-.request-btn-icon{ width:17px; height:17px; flex-shrink:0; }
-.request-btn:active{ transform:scale(.98); box-shadow:0 5px 14px rgba(16,185,129,0.22); }
+.request-btn:active{ transform:scale(.98); box-shadow:0 3px 10px rgba(0,0,0,0.28); }
 @media (hover:hover) and (pointer:fine){
-.request-btn:hover{ box-shadow:0 14px 32px rgba(16,185,129,0.36), inset 0 1px 0 rgba(255,255,255,0.22); transform:translateY(-1px); }
+  .request-btn:hover{ border-color:rgba(16,185,129,0.32); box-shadow:0 8px 20px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.08); }
 }
 .request-btn.loading{ background:linear-gradient(150deg,#14181C,#0C0F12); color:var(--text-secondary); cursor:default; border-color:rgba(255,255,255,0.08); box-shadow:none; }
-.request-btn.loading .request-btn-icon{ display:none; }
 .request-btn.done{ background:linear-gradient(150deg,#123B34,#0D2A26); color:#CFF7F1; border-color:rgba(16,185,129,0.3); box-shadow:0 6px 16px rgba(0,0,0,0.3); }
-.request-btn.done .request-btn-icon{ display:none; }
 .footnote{ margin-top:8px; font-size:9.5px; color:var(--text-tertiary); text-align:center; transition: max-height .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, margin-top .4s ease; }
 .sheet-handle{ display:none; }
 .rc-mini-route{ display:none; }
@@ -345,33 +339,7 @@ box-shadow:0 10px 26px rgba(16,185,129,0.28), inset 0 1px 0 rgba(255,255,255,0.1
 
 .toast{ position:fixed; left:50%; top:64px; transform:translate(-50%,-8px); z-index:30; padding:9px 16px; border-radius:10px; background:rgba(20,10,10,0.65); border:1px solid rgba(255,90,80,0.28); color:#ffb3ab; font-size:11.5px; opacity:0; pointer-events:none; transition: opacity .35s ease, transform .35s ease; backdrop-filter: blur(14px); max-width:88vw; text-align:center; }
 .toast.show{ opacity:1; transform:translate(-50%,0); }
-/* Estado de carga inicial del mapa: spinner elegante mientras el estilo
-   base (tiles + fuentes) termina de cargar. Se oculta en cuanto MapLibre
-   dispara 'load'. Si nunca llega a cargar (o hay un error real ANTES de
-   ese evento), pasa a un estado de error genuino con botón de reintento —
-   ya no se dispara un aviso de error por cualquier incidencia menor del
-   mapa (íconos de sprite ausentes, un tile puntual, etc.). */
-.map-loading{
-  position:fixed; inset:0; z-index:35; display:flex; flex-direction:column;
-  align-items:center; justify-content:center; gap:14px; background:var(--bg-deep);
-  opacity:1; visibility:visible; transition: opacity .5s ease, visibility 0s linear 0s;
-}
-.map-loading.hide{ opacity:0; pointer-events:none; visibility:hidden; transition: opacity .5s ease, visibility 0s linear .5s; }
-.map-loading-spinner{
-  width:34px; height:34px; border-radius:50%;
-  border:2.5px solid rgba(16,185,129,0.18); border-top-color:var(--accent-2);
-  animation: mapSpin 0.85s linear infinite;
-}
-@keyframes mapSpin{ to{ transform:rotate(360deg); } }
-.map-loading-text{ font-size:12px; font-weight:600; color:var(--text-secondary); letter-spacing:.01em; }
-.map-loading.error .map-loading-spinner{ display:none; }
-.map-loading.error .map-loading-text{ color:#ffb3ab; }
-.map-loading-retry{
-  display:none; margin-top:2px; padding:8px 18px; border-radius:10px;
-  border:1px solid rgba(255,255,255,0.12); background:linear-gradient(150deg, #1B222A, #0F1418 75%);
-  color:#F5F7F9; font-size:12px; font-weight:600; cursor:pointer;
-}
-.map-loading.error .map-loading-retry{ display:inline-block; }
+
 /* ===== BOTTOM SHEET NATIVO DE 3 ESTADOS (solo móvil): el mapa manda como
    elemento principal. "Colapsado" deja ver casi todo el mapa (solo una
    franja mínima con ruta + precio + CTA rápido). "Medio" es el estado por
@@ -495,11 +463,7 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
 <div class="map-grain"></div>
 <div class="sheet-scrim"></div>
 <div class="toast" id="toast">No se pudo cargar el mapa. Revisa tu conexión.</div>
-<div class="map-loading" id="mapLoading">
-  <div class="map-loading-spinner"></div>
-  <div class="map-loading-text">Cargando el mapa…</div>
-  <button class="map-loading-retry" id="mapLoadingRetry">Reintentar</button>
-</div>
+
 <div class="searching-overlay" id="searchingOverlay">
   <div class="panel searching-card">
     <div class="radar"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-core"></div></div>
@@ -563,10 +527,7 @@ button:focus-visible,a:focus-visible{ outline:2px solid var(--accent-2); outline
         <div class="estimate-card"><div class="elabel">Tiempo</div><div class="evalue mono" id="etaText">25 min</div></div>
         <div class="estimate-card price"><div class="elabel">Precio</div><div class="evalue mono" id="priceText">$4.500</div></div>
       </div>
-      <button class="request-btn" id="requestBtn">
-  <svg class="request-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M13 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-  <span id="requestBtnLabel">Pedir viaje</span>
-</button>
+      <button class="request-btn" id="requestBtn">Solicitar movilidad</button>
       <div class="footnote">Incluye recargo por zona rural</div>
     </div>
   </div>
@@ -642,36 +603,41 @@ const LOCATIONS = [
   { name: 'Estadio Municipal N°1, Salamanca',             coord: [-70.9650, -31.7770] },
   { name: 'Colliguay, Salamanca',                         coord: GEO.colliguay },
   { name: 'El Tambo, Salamanca',                          coord: GEO.elTambo },
-  { name: 'Chalinga, Salamanca', coord: GEO.chalinga },
-  { name: 'Sofit Gimnasio Salamanca, Manuel Bulnes, Salamanca', coord: [-70.9613, -31.7824] }
+  { name: 'Chalinga, Salamanca',                          coord: GEO.chalinga }
 ];
 
 /* Puntos de interés reales de Salamanca mostrados como marcadores fijos en el mapa */
 const POI_ICONS = {
   landmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M12 4l8 3.5-8 3.5-8-3.5L12 4z" stroke-linejoin="round"/></svg>',
   government: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21h16M5 21V9l7-5 7 5v12M9 21v-6h6v6" stroke-linejoin="round"/></svg>',
+  church: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
   transport: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="12" rx="2"/><path d="M4 13h16M7 17v2M17 17v2" stroke-linecap="round"/><circle cx="8" cy="10" r="0.6" fill="currentColor"/><circle cx="16" cy="10" r="0.6" fill="currentColor"/></svg>',
   health: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
+  cafe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 5c0-1 .8-1.2.8-2M12 5c0-1 .8-1.2.8-2" stroke-linecap="round"/></svg>',
+  food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v7a2 2 0 0 0 4 0V2M8 9v13M17 2c-2 0-3 2-3 5s1 4 3 4 0 8 0 11" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16l-1.5 11a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8L4 8z" stroke-linejoin="round"/><path d="M8 8V6a4 4 0 0 1 8 0v2" stroke-linecap="round"/></svg>',
+  gas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 21h10M16 8h1.5L20 10.5V17a1.5 1.5 0 0 1-3 0v-3h-1" stroke-linejoin="round" stroke-linecap="round"/></svg>',
   pharmacy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
-  bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M4 10v9M8 10v9M12 10v9M16 10v9M20 10v9M2 21h20" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>'
+  sports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" stroke-linecap="round" opacity="0.7"/></svg>'
 };
 
-/* Respaldo mínimo (solo entra en juego si Overpass no responde). Se
-   limita a las mismas 8 categorías aprobadas — no se agregan bancos ni
-   bomberos aquí porque no tenemos su ubicación verificada; si Overpass
-   falla, simplemente no se muestran (mejor ausentes que desplazados). */
 const POI_PLACES = [
-  { name: 'Plaza de Armas',             category: 'landmark',   coord: GEO.salamanca },
+  { name: 'Plaza de Armas',            category: 'landmark',   coord: GEO.salamanca },
   { name: 'Municipalidad de Salamanca', category: 'government', coord: [-70.9659, -31.7810] },
-  { name: 'Terminal de Buses',          category: 'transport',  coord: [-70.9631, -31.7790] },
-  { name: 'Hospital de Salamanca',      category: 'health',     coord: [-70.9711, -31.7743] },
-  { name: 'Unimarc',                    category: 'market',     coord: [-70.9612, -31.7825] },
-  { name: 'Super Bodega aCuenta',       category: 'market',     coord: [-70.9621, -31.7820] },
-  { name: 'Supermercado Piolín',        category: 'market',     coord: [-70.9633, -31.7822] },
-  { name: 'Farmacia Jarufe',            category: 'pharmacy',   coord: [-70.9645, -31.7784] },
-  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] }
+  { name: 'Parroquia Ntra. Sra. del Rosario', category: 'church', coord: [-70.9654, -31.7814] },
+  { name: 'Terminal de Buses',         category: 'transport',  coord: [-70.9631, -31.7790] },
+  { name: 'Hospital de Salamanca',     category: 'health',     coord: [-70.9711, -31.7743] },
+  { name: 'Azotea 400',                category: 'landmark',   coord: [-70.9674, -31.7801] },
+  { name: 'Dolce Coffee',              category: 'cafe',       coord: [-70.9639, -31.7798] },
+  { name: 'Entre Nos',                 category: 'food',       coord: [-70.9646, -31.7772] },
+  { name: 'Unimarc',                   category: 'market',     coord: [-70.9612, -31.7825] },
+  { name: 'Super Bodega aCuenta',      category: 'market',     coord: [-70.9621, -31.7820] },
+  { name: 'Supermercado Piolín',       category: 'market',     coord: [-70.9633, -31.7822] },
+  { name: "Copec O'Higgins",           category: 'gas',        coord: [-70.9637, -31.7801] },
+  { name: 'Copec Sector Sali',         category: 'gas',        coord: [-70.9800, -31.7751] },
+  { name: 'Farmacia Jarufe',           category: 'pharmacy',   coord: [-70.9645, -31.7784] },
+  { name: 'Cruz Verde',                category: 'pharmacy',   coord: [-70.9646, -31.7790] },
+  { name: 'Estadio Municipal N°1',     category: 'sports',     coord: [-70.9650, -31.7770] }
 ];
 
 /* ---------- POI REALES DESDE OPENSTREETMAP (Overpass API) ----------
@@ -682,20 +648,21 @@ const POI_PLACES = [
    para no dejar el mapa vacío. */
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
-/* Solo las 8 categorías relevantes para un viaje en Salamanca: hospital,
-   farmacia, municipalidad, terminal, banco, bomberos, supermercado y
-   plaza. Todo lo demás (iglesias, cafés, comida, bencineras, deporte,
-   turismo) queda fuera para no saturar el mapa. */
 function classifyOSMTags(tags) {
   if (!tags) return null;
   if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return 'health';
-  if (tags.amenity === 'pharmacy') return 'pharmacy';
   if (tags.amenity === 'townhall') return 'government';
+  if (tags.amenity === 'place_of_worship') return 'church';
   if (tags.amenity === 'bus_station') return 'transport';
-  if (tags.amenity === 'bank') return 'bank';
-  if (tags.amenity === 'fire_station') return 'firestation';
+  if (tags.amenity === 'cafe') return 'cafe';
+  if (tags.amenity === 'restaurant' || tags.amenity === 'fast_food') return 'food';
+  if (tags.amenity === 'fuel') return 'gas';
+  if (tags.amenity === 'pharmacy') return 'pharmacy';
+  if (tags.amenity === 'marketplace') return 'market';
   if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
+  if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre') return 'sports';
   if (tags.leisure === 'square' || tags.place === 'square') return 'landmark';
+  if (tags.tourism === 'attraction' || tags.tourism === 'museum' || tags.historic) return 'landmark';
   return null;
 }
 
@@ -703,14 +670,17 @@ async function fetchOSMPOIs() {
   const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
   const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
   const query = `[out:json][timeout:25];(
-node["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
-way["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
-node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
-way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
-node["leisure"="square"](${bbox});
-node["place"="square"](${bbox});
-);
-out center tags;`;
+    node["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace)$"](${bbox});
+    way["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace)$"](${bbox});
+    node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
+    way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
+    node["leisure"~"^(stadium|sports_centre|square)$"](${bbox});
+    way["leisure"~"^(stadium|sports_centre|square)$"](${bbox});
+    node["place"="square"](${bbox});
+    node["tourism"~"^(attraction|museum)$"](${bbox});
+    way["tourism"~"^(attraction|museum)$"](${bbox});
+  );
+  out center tags;`;
 
   const res = await fetch(OVERPASS_ENDPOINT, {
     method: 'POST',
@@ -755,8 +725,8 @@ function haversineMeters(a, b) {
 }
 
 const POI_CATEGORY_PRIORITY = {
-  health:0, pharmacy:1, firestation:2, government:3, bank:4,
-  transport:5, market:6, landmark:7
+  health:0, pharmacy:1, government:2, transport:3, church:4,
+  market:5, gas:6, sports:7, landmark:8, cafe:9, food:10
 };
 
 function declutterPOIs(pois, minDistMeters = 90, maxTotal = 20) {
@@ -773,243 +743,129 @@ function declutterPOIs(pois, minDistMeters = 90, maxTotal = 20) {
   return kept;
 }
 
-/* ---------- POI: capa nativa GeoJSON + SymbolLayer (WebGL) ----------
-   Refactor completo: los POI ya NO usan maplibregl.Marker con elementos
-   HTML absolutamente posicionados (esa vía dependía de que el DOM y el
-   canvas quedaran perfectamente sincronizados, lo que fallaba en varios
-   escenarios móviles). En su lugar, cada POI es un feature dentro de una
-   GeoJSON Source ('pois'), pintado por una SymbolLayer nativa
-   ('poi-layer') — exactamente el mismo mecanismo con el que MapLibre
-   dibuja las calles y las etiquetas del propio estilo base. El motor
-   WebGL se encarga de proyectar cada ícono en su coordenada geográfica
-   real en cada frame; no hay reproyección manual ni verificación de
-   posición porque, a diferencia del DOM, esta capa nunca puede
-   desincronizarse del mapa. */
+/* poiMarkers guarda { marker, coord, el } por cada POI: se necesita la
+   coordenada original y el elemento DOM para poder verificar y, si hace
+   falta, forzar la reproyección real de cada marcador. */
+let poiMarkers = [];
 
-/* Cada categoría se "hornea" una sola vez como una imagen (raster)
-   registrada en el motor vía map.addImage — un círculo de vidrio oscuro
-   con borde esmeralda y el ícono de la categoría dentro, igual al
-   diseño anterior. Se genera una variante normal y una "-active" (más
-   brillante) para el estado seleccionado, ambas dibujadas a partir del
-   mismo SVG que ya se usaba para los íconos. */
-function svgToDataUrl(svg) {
-  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
-}
-
-function poiIconInnerMarkup(category) {
-  const raw = POI_ICONS[category] || POI_ICONS.landmark;
-  const match = raw.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
-  return match ? match[1] : '';
-}
-
-function buildPoiMarkerSVG(category, active) {
-  const size = 64;
-  const inner = poiIconInnerMarkup(category);
-  const stroke = active ? '#6EE7B7' : 'rgba(16,185,129,0.5)';
-  const strokeW = active ? 2.6 : 1.8;
-  const bg1 = active ? 'rgba(8,90,68,0.95)' : 'rgba(20,26,22,0.92)';
-  const bg2 = active ? 'rgba(5,46,35,0.95)' : 'rgba(11,15,13,0.92)';
-  /* Verde esmeralda un punto más apagado en el estado normal (el
-     seleccionado se mantiene vívido para que siga destacando). */
-  const glyphColor = active ? '#10B981' : '#0EA173';
-  const glow = active ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#10B981" stroke-width="1.4" opacity="0.5"/>` : '';
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <defs>
-      <linearGradient id="poiBg-${category}-${active ? 'a' : 'n'}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/>
-      </linearGradient>
-    </defs>
-    ${glow}
-    <circle cx="32" cy="32" r="26" fill="url(#poiBg-${category}-${active ? 'a' : 'n'})" stroke="${stroke}" stroke-width="${strokeW}"/>
-    <g transform="translate(18,18) scale(1.17)" fill="none" stroke="${glyphColor}" style="color:${glyphColor}" opacity="${active ? 1 : 0.9}">${inner}</g>
-  </svg>`;
-}
-
-function loadImagePromise(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = url;
+function renderPOIMarkers(rawPois) {
+  const pois = declutterPOIs(rawPois);
+  poiMarkers.forEach(entry => entry.marker.remove());
+  poiMarkers = [];
+  pois.forEach((poi) => {
+    const el = document.createElement('div');
+    el.className = 'poi-marker poi-marker-pending';
+    el.innerHTML = (POI_ICONS[poi.category] || POI_ICONS.landmark) + `<div class="poi-tip">${poi.name}</div>`;
+    /* Tap-to-toggle en móvil: el hover no existe en pantallas táctiles,
+       así que el tooltip del POI se abre/cierra con un tap. */
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const tip = el.querySelector('.poi-tip');
+      const wasOpen = tip.classList.contains('show-tip');
+      document.querySelectorAll('.poi-tip.show-tip').forEach(t => t.classList.remove('show-tip'));
+      if (!wasOpen) tip.classList.add('show-tip');
+    });
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(poi.coord).addTo(map);
+    poiMarkers.push({ marker, coord: poi.coord, el });
   });
+  revealVerifiedMarkers();
 }
+document.addEventListener('click', () => {
+  document.querySelectorAll('.poi-tip.show-tip').forEach(t => t.classList.remove('show-tip'));
+});
 
-let poiIconsReady = null;
-function ensurePoiIcons() {
-  if (poiIconsReady) return poiIconsReady;
-  const categories = Object.keys(POI_ICONS);
-  poiIconsReady = Promise.all(categories.map(async (cat) => {
-    const [imgNormal, imgActive] = await Promise.all([
-      loadImagePromise(svgToDataUrl(buildPoiMarkerSVG(cat, false))),
-      loadImagePromise(svgToDataUrl(buildPoiMarkerSVG(cat, true)))
-    ]);
-    if (!map.hasImage(cat)) map.addImage(cat, imgNormal, { pixelRatio: 2 });
-    if (!map.hasImage(cat + '-active')) map.addImage(cat + '-active', imgActive, { pixelRatio: 2 });
-  }));
-  return poiIconsReady;
-}
+/* ---------- Sincronización robusta con el ciclo de vida real de MapLibre ----------
+   En vez de asumir con un retraso fijo que el contenedor ya tiene su tamaño
+   final, se observa su tamaño real con ResizeObserver hasta que se
+   mantiene sin cambios durante varios frames de pintado consecutivos.
+   La espera termina por CONDICIÓN (tamaño estable), nunca por un tiempo
+   arbitrario: cualquier cambio real de tamaño reinicia el conteo. */
+function waitForStableContainerSize(container, requiredStableFrames = 4) {
+  return new Promise((resolve) => {
+    let lastW = -1, lastH = -1;
+    let stableFrames = 0;
 
-function poisToGeoJSON(pois) {
-  return {
-    type: 'FeatureCollection',
-    features: pois.map((p, i) => ({
-      type: 'Feature',
-      id: i,
-      geometry: { type: 'Point', coordinates: p.coord },
-      properties: {
-        name: p.name,
-        category: POI_ICONS[p.category] ? p.category : 'landmark'
+    const observer = new ResizeObserver(() => { stableFrames = 0; });
+    observer.observe(container);
+
+    function checkFrame() {
+      const rect = container.getBoundingClientRect();
+      const w = rect.width, h = rect.height;
+      const unchanged = w > 0 && h > 0 && w === lastW && h === lastH;
+      stableFrames = unchanged ? stableFrames + 1 : 0;
+      lastW = w; lastH = h;
+
+      if (stableFrames >= requiredStableFrames) {
+        observer.disconnect();
+        resolve({ width: w, height: h });
+        return;
       }
-    }))
-  };
+      requestAnimationFrame(checkFrame);
+    }
+    requestAnimationFrame(checkFrame);
+  });
 }
 
-/* Estado de selección (tap sobre un POI): se usa feature-state nativo de
-   MapLibre — la fuente de verdad vive en la GeoJSON source, no en el DOM,
-   por lo que el ícono activo siempre se pinta sobre la coordenada
-   correcta sin ningún cálculo adicional de nuestra parte. */
-let selectedPoiId = null;
-let poiPopup = null;
-
-function clearPoiSelection() {
-  selectedPoiId = null;
-  if (map.getSource('poi-selected')) {
-    map.getSource('poi-selected').setData({ type: 'FeatureCollection', features: [] });
-  }
-  if (poiPopup) { poiPopup.remove(); poiPopup = null; }
+/* Espera al evento nativo 'idle' de MapLibre (sin frames de render
+   pendientes tras el resize). Se fuerza un repintado para garantizar que
+   el evento se dispare siempre, incluso si el mapa ya estaba en reposo. */
+function waitForMapIdle() {
+  return new Promise((resolve) => {
+    map.once('idle', resolve);
+    map.triggerRepaint();
+  });
 }
 
-function selectPOI(feature) {
-  selectedPoiId = feature.id;
-  if (map.getSource('poi-selected')) {
-    map.getSource('poi-selected').setData({ type: 'FeatureCollection', features: [feature] });
+/* Verificación final: confirma que cada marcador fue proyectado por
+   MapLibre dentro de los límites reales del contenedor antes de
+   revelarlo. Si alguno quedara fuera de rango, se reafirma su coordenada
+   para forzar una reproyección real y se revalida en el siguiente frame
+   de pintado — nunca con un temporizador fijo. */
+function revealVerifiedMarkers(attempt = 0) {
+  const bounds = map.getContainer().getBoundingClientRect();
+  let allOk = true;
+
+  poiMarkers.forEach(entry => {
+    const r = entry.el.getBoundingClientRect();
+    const withinBounds =
+      r.left >= bounds.left - 40 && r.right <= bounds.right + 40 &&
+      r.top >= bounds.top - 40 && r.bottom <= bounds.bottom + 40 &&
+      (r.left !== 0 || r.top !== 0); // (0,0) es la señal típica de una proyección aún no asentada
+    if (withinBounds) {
+      entry.el.classList.remove('poi-marker-pending');
+    } else {
+      allOk = false;
+      entry.marker.setLngLat(entry.coord); // fuerza reproyección real vía MapLibre
+    }
+  });
+
+  if (!allOk && attempt < 12) {
+    requestAnimationFrame(() => revealVerifiedMarkers(attempt + 1));
   }
-
-  const coords = feature.geometry.coordinates.slice();
-  const name = feature.properties.name;
-
-  const container = document.createElement('div');
-  const nameEl = document.createElement('div');
-  nameEl.className = 'poi-popup-name';
-  nameEl.textContent = name;
-  const btn = document.createElement('button');
-  btn.className = 'poi-popup-btn';
-  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-11a7 7 0 1 0-14 0c0 4.5 7 11 7 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>Usar como destino</span>';
-  btn.addEventListener('click', () => {
-    currentDestination = { name, coord: coords };
-    toText.value = name;
-    rebuildTrip();
-    clearPoiSelection();
-    if (window.innerWidth <= 880) setSheet('mid');
-  });
-  container.appendChild(nameEl);
-  container.appendChild(btn);
-
-  poiPopup = new maplibregl.Popup({
-    closeButton: false, closeOnClick: false, offset: 24,
-    className: 'poi-popup-wrap', maxWidth: '220px'
-  }).setLngLat(coords).setDOMContent(container).addTo(map);
-}
-
-function addPOILayer(rawPois) {
-  const data = poisToGeoJSON(declutterPOIs(rawPois));
-
-  if (map.getSource('pois')) {
-    map.getSource('pois').setData(data);
-    return;
-  }
-
-  map.addSource('pois', { type: 'geojson', data });
-  map.addSource('poi-selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-
-  const sizeExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78];
-  const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
-
-  /* Solo se ven siempre los POI clave (salud, gobierno, transporte, plaza,
-     bomberos); los "secundarios" (farmacia, banco, supermercado) quedan
-     ocultos hasta zoom 14, así el mapa alejado se siente limpio y con
-     espacio, y se llena de contexto solo al acercarse. */
-  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation'];
-  const poiOpacityExpr = ['step', ['zoom'],
-    ['match', ['get', 'category'], ESSENTIAL_POI, 0.88, 0],
-    14, 0.88
-  ];
-
-  const textLayout = {
-    'text-field': ['get', 'name'],
-    'text-font': ['Noto Sans Regular'],
-    /* Nombres 25% más chicos que antes (10.5/12/13 -> 8/9/10) */
-    'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 9, 17, 10],
-    'text-offset': [0, 1.4],
-    'text-anchor': 'top',
-    'text-allow-overlap': false,
-    'text-optional': true,
-    'text-max-width': 8
-  };
-  const textPaint = {
-    /* Gris tenue en vez de casi blanco, para que el nombre no compita
-       visualmente con la ruta (verde esmeralda) ni el destino. */
-    'text-color': '#9FADA9',
-    'text-halo-color': 'rgba(6,9,12,0.85)',
-    'text-halo-width': 1,
-    'text-opacity': poiOpacityExpr
-  };
-  const iconPaint = { 'icon-opacity': poiOpacityExpr };
-
-  /* MapLibre no admite expresiones de feature-state en propiedades de
-     layout (icon-image, icon-size) — solo en paint. En vez de forzarlo
-     (lo que hacía que addLayer lanzara un error y NUNCA se creara la
-     capa), el POI "seleccionado" se resuelve con una segunda fuente
-     GeoJSON aparte que solo contiene el punto activo; sigue siendo 100%
-     nativo de MapLibre, solo que en dos capas en vez de una condicional. */
-  map.addLayer({
-    id: 'poi-layer', type: 'symbol', source: 'pois',
-    layout: {
-      'icon-image': ['get', 'category'],
-      'icon-size': sizeExpr,
-      'icon-allow-overlap': true,
-      'icon-ignore-placement': true,
-      'icon-anchor': 'center',
-      ...textLayout
-    },
-    paint: { ...textPaint, ...iconPaint }
-  });
-
-  /* El POI seleccionado por el usuario (destino elegido) siempre se ve a
-     opacidad plena, sin filtro por zoom — fue una elección explícita. */
-  map.addLayer({
-    id: 'poi-selected-layer', type: 'symbol', source: 'poi-selected',
-    layout: {
-      'icon-image': ['concat', ['get', 'category'], '-active'],
-      'icon-size': sizeExprActive,
-      'icon-allow-overlap': true,
-      'icon-ignore-placement': true,
-      'icon-anchor': 'center',
-      ...textLayout
-    },
-    paint: { ...textPaint, 'text-opacity': 1, 'icon-opacity': 1 }
-  });
-
-  map.on('click', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
-    if (features.length) selectPOI(features[0]);
-    else clearPoiSelection();
-  });
-  ['poi-layer', 'poi-selected-layer'].forEach(id => {
-    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
-    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
-  });
 }
 
 async function addPOIMarkers() {
-  await ensurePoiIcons();
+  const container = map.getContainer();
+
+  // 1) Esperar a que el contenedor tenga un tamaño real y estable
+  //    (resuelve por condición de tamaño, no por tiempo).
+  await waitForStableContainerSize(container);
+
+  // 2) Forzar el resize de MapLibre solo una vez confirmadas las
+  //    dimensiones finales, para que su proyección interna quede correcta.
+  map.resize();
+
+  // 3) Esperar a que el motor confirme que terminó de renderizar con esas
+  //    dimensiones (evento nativo 'idle', no un tiempo fijo).
+  await waitForMapIdle();
+
   try {
     const pois = await fetchOSMPOIs();
-    if (pois.length) { addPOILayer(pois); return; }
+    if (pois.length) { renderPOIMarkers(pois); return; }
     throw new Error('Overpass devolvió 0 resultados');
   } catch (err) {
     console.warn('No se pudo consultar Overpass (OpenStreetMap) para los POI, se usa el respaldo mínimo:', err);
-    addPOILayer(POI_PLACES);
+    renderPOIMarkers(POI_PLACES);
   }
 }
 
@@ -1044,43 +900,10 @@ map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-
 map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
 map.addControl(new maplibregl.ScaleControl({ maxWidth: 90, unit: 'metric' }), 'bottom-left');
 
-/* ---------- Estado de carga real del mapa (spinner -> listo / error real) ---------- */
-let mapLoaded = false;
-let mapLoadTimeout = null;
-const mapLoadingEl = document.getElementById('mapLoading');
-
-function hideMapLoading() {
-  mapLoaded = true;
-  if (mapLoadTimeout) { clearTimeout(mapLoadTimeout); mapLoadTimeout = null; }
-  if (mapLoadingEl) mapLoadingEl.classList.add('hide');
-}
-
-function showMapLoadError() {
-  if (mapLoaded) return; // el mapa ya cargó bien; un error posterior no es un fallo de carga
-  if (mapLoadingEl) {
-    mapLoadingEl.classList.add('error');
-    const t = mapLoadingEl.querySelector('.map-loading-text');
-    if (t) t.textContent = 'No se pudo cargar el mapa. Revisa tu conexión.';
-  }
-}
-
-map.on('load', hideMapLoading);
-
-/* El evento 'error' de MapLibre también se dispara por incidencias menores
-   (un ícono de sprite ausente, un tile puntual) que no impiden que el mapa
-   funcione. Solo se trata como fallo real si ocurre ANTES de que el mapa
-   haya terminado de cargar su estilo base. */
 map.on('error', (e) => {
   console.warn('Map error', e && e.error);
-  if (!mapLoaded) showMapLoadError();
+  showToast('No se pudo cargar el mapa. Revisa tu conexión.');
 });
-
-/* Si el estilo no carga en un tiempo razonable (sin conexión, CDN caído),
-   se asume fallo real y se muestra el estado de error con reintento. */
-mapLoadTimeout = setTimeout(() => { if (!mapLoaded) showMapLoadError(); }, 12000);
-
-const mapLoadingRetryBtn = document.getElementById('mapLoadingRetry');
-if (mapLoadingRetryBtn) mapLoadingRetryBtn.addEventListener('click', () => location.reload());
 
 /* ---------- C. RUTA REAL (OSRM) CON FALLBACK LOCAL ---------- */
 const OSRM_ENDPOINT = 'https://router.project-osrm.org/route/v1/driving/';
@@ -1146,20 +969,19 @@ function addRouteLayers() {
      destaca con claridad sobre el mapa sin verse exagerada. */
   map.addLayer({ id: 'route-glow', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 16, 18],
-      'line-blur': 9, 'line-opacity': 0.2 } });
+    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 16, 16],
+      'line-blur': 9, 'line-opacity': 0.16 } });
 
-  /* línea principal: nítida, sobre el halo — un poco más gruesa para que
-     la ruta gane protagonismo frente a los POI (ahora más discretos). */
+  /* línea principal: nítida, sobre el halo */
   map.addLayer({ id: 'route-line', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
-      'line-opacity': 0.97 } });
+    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.9, 16, 4.2],
+      'line-opacity': 0.95 } });
 
   let breatheT = 0;
   setInterval(() => {
     breatheT += 0.04;
-    const v = 0.2 + Math.sin(breatheT) * 0.04;
+    const v = 0.16 + Math.sin(breatheT) * 0.035;
     if (map.getLayer('route-glow')) map.setPaintProperty('route-glow', 'line-opacity', v);
   }, 100);
 }
@@ -1367,17 +1189,22 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => fitRouteView(ROUTE_LINE), 350);
 });
 
-/* ---------- Sincronización del canvas en móviles ----------
-   Con la capa de POI ya nativa (GeoJSON + SymbolLayer), el motor WebGL
-   reproyecta cada ícono automáticamente en cada frame — ya no hace falta
-   reafirmar coordenadas ni verificar posiciones manualmente. Lo único que
-   sigue siendo necesario es avisarle a MapLibre cuando el contenedor
-   cambia de tamaño sin aviso (aparece/oculta la barra de direcciones,
-   rotación de pantalla), para que recalcule el canvas y su viewport
-   interno; una vez hecho eso, todas las capas (calles, ruta y POI) se
-   redibujan correctamente por sí solas. */
+/* ---------- Corrección de posición de los POI en móviles ----------
+   Los marcadores de POI se ubican exclusivamente a través del sistema de
+   proyección de MapLibre (coordenada geográfica → píxel de pantalla). En
+   navegadores móviles el contenedor del mapa puede cambiar de tamaño sin
+   aviso (aparece/oculta la barra de direcciones, rotación de pantalla),
+   dejando esa proyección desincronizada y agrupando los POI en una
+   esquina en vez de sobre su ubicación real. Esto obliga a MapLibre a
+   recalcular el canvas y reafirma la coordenada real de cada POI para
+   que se reproyecten correctamente sobre el lugar exacto del mapa. */
 async function repositionPOIMarkers() {
+  const container = map.getContainer();
+  await waitForStableContainerSize(container);
   map.resize();
+  await waitForMapIdle();
+  poiMarkers.forEach(entry => entry.marker.setLngLat(entry.coord));
+  revealVerifiedMarkers();
 }
 window.addEventListener('orientationchange', () => repositionPOIMarkers());
 if (window.visualViewport) {
@@ -1739,7 +1566,7 @@ function startRequestFlow() {
   if (busy) return; busy = true;
   driverCard.classList.remove('visible', 'assigned');
   carEl.classList.remove('visible');
-  requestBtn.classList.add('loading'); document.getElementById('requestBtnLabel').textContent = 'Buscando conductor…';
+  requestBtn.classList.add('loading'); requestBtn.textContent = 'Buscando conductor…';
   setSheet('collapsed'); // deja ver el mapa casi por completo mientras busca
 
   let msgIdx = 0;
@@ -1755,13 +1582,13 @@ function startRequestFlow() {
     clearInterval(msgTimer);
     searchingOverlay.classList.remove('show');
     requestBtn.classList.remove('loading'); requestBtn.classList.add('done');
-document.getElementById('requestBtnLabel').textContent = '¡Conductor asignado!';
+    requestBtn.textContent = '¡Conductor asignado!';
     driverCard.classList.add('visible', 'assigned');
     restartTravel();
     carEl.classList.add('visible');
     setSheet('mid');
     map.easeTo({ zoom: Math.min(17, map.getZoom() + 0.55), duration: 1300, easing: cameraEasing, essential: true });
-    setTimeout(() => { requestBtn.classList.remove('done'); document.getElementById('requestBtnLabel').textContent = 'Pedir viaje'; busy = false; }, 2600);
+    setTimeout(() => { requestBtn.classList.remove('done'); requestBtn.textContent = 'Solicitar movilidad'; busy = false; }, 2600);
   }, waitTime);
 }
 requestBtn.addEventListener('click', startRequestFlow);
