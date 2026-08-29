@@ -650,39 +650,28 @@ const LOCATIONS = [
 const POI_ICONS = {
   landmark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M12 4l8 3.5-8 3.5-8-3.5L12 4z" stroke-linejoin="round"/></svg>',
   government: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21h16M5 21V9l7-5 7 5v12M9 21v-6h6v6" stroke-linejoin="round"/></svg>',
-  church: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6M9 5h6M6 22V11l6-4 6 4v11M6 22h12M10 22v-5h4v5" stroke-linejoin="round"/></svg>',
   transport: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="12" rx="2"/><path d="M4 13h16M7 17v2M17 17v2" stroke-linecap="round"/><circle cx="8" cy="10" r="0.6" fill="currentColor"/><circle cx="16" cy="10" r="0.6" fill="currentColor"/></svg>',
   health: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
-  cafe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z" stroke-linejoin="round"/><path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 5c0-1 .8-1.2.8-2M12 5c0-1 .8-1.2.8-2" stroke-linecap="round"/></svg>',
-  food: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2v7a2 2 0 0 0 4 0V2M8 9v13M17 2c-2 0-3 2-3 5s1 4 3 4 0 8 0 11" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   market: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16l-1.5 11a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8L4 8z" stroke-linejoin="round"/><path d="M8 8V6a4 4 0 0 1 8 0v2" stroke-linecap="round"/></svg>',
-  gas: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 21V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 21h10M16 8h1.5L20 10.5V17a1.5 1.5 0 0 1-3 0v-3h-1" stroke-linejoin="round" stroke-linecap="round"/></svg>',
   pharmacy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8" stroke-linecap="round"/></svg>',
-  sports: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18" stroke-linecap="round" opacity="0.7"/></svg>',
-  gym: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6M20 9v6M7 7v10M17 7v10M7 12h10" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+  bank: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-6 9 6M4 10v9M8 10v9M12 10v9M16 10v9M20 10v9M2 21h20" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  firestation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3c2 3-1 4-1 7a3 3 0 0 0 6 0c0-1-.4-2-.4-2s.6 5-2.6 5c-3 0-3-3-1-6 0 0-5 2-5 8a5 5 0 0 0 10 0c0-6-4-8-6-12z" stroke-linejoin="round"/></svg>'
 };
 
+/* Respaldo mínimo (solo entra en juego si Overpass no responde). Se
+   limita a las mismas 8 categorías aprobadas — no se agregan bancos ni
+   bomberos aquí porque no tenemos su ubicación verificada; si Overpass
+   falla, simplemente no se muestran (mejor ausentes que desplazados). */
 const POI_PLACES = [
-  { name: 'Plaza de Armas',            category: 'landmark',   coord: GEO.salamanca },
+  { name: 'Plaza de Armas',             category: 'landmark',   coord: GEO.salamanca },
   { name: 'Municipalidad de Salamanca', category: 'government', coord: [-70.9659, -31.7810] },
-  { name: 'Parroquia Ntra. Sra. del Rosario', category: 'church', coord: [-70.9654, -31.7814] },
-  { name: 'Terminal de Buses',         category: 'transport',  coord: [-70.9631, -31.7790] },
-  { name: 'Hospital de Salamanca',     category: 'health',     coord: [-70.9711, -31.7743] },
-  { name: 'Azotea 400',                category: 'landmark',   coord: [-70.9674, -31.7801] },
-  { name: 'Dolce Coffee',              category: 'cafe',       coord: [-70.9639, -31.7798] },
-  { name: 'Entre Nos',                 category: 'food',       coord: [-70.9646, -31.7772] },
-  { name: 'Unimarc',                   category: 'market',     coord: [-70.9612, -31.7825] },
-  { name: 'Super Bodega aCuenta',      category: 'market',     coord: [-70.9621, -31.7820] },
-  { name: 'Supermercado Piolín',       category: 'market',     coord: [-70.9633, -31.7822] },
-  { name: "Copec O'Higgins",           category: 'gas',        coord: [-70.9637, -31.7801] },
-  { name: 'Copec Sector Sali',         category: 'gas',        coord: [-70.9800, -31.7751] },
-  { name: 'Farmacia Jarufe',           category: 'pharmacy',   coord: [-70.9645, -31.7784] },
-  { name: 'Cruz Verde',                category: 'pharmacy',   coord: [-70.9646, -31.7790] },
-  { name: 'Estadio Municipal N°1', category: 'sports', coord: [-70.9650, -31.7770] },
-  /* Sofit Gimnasio Salamanca — Manuel Bulnes 701, Salamanca. Coordenada
-     estimada sobre esa calle (mismo tramo que Unimarc); ajustar si se
-     obtiene la geocodificación exacta de la dirección. */
-  { name: 'Sofit Gimnasio Salamanca', category: 'gym', coord: [-70.9613, -31.7824] }
+  { name: 'Terminal de Buses',          category: 'transport',  coord: [-70.9631, -31.7790] },
+  { name: 'Hospital de Salamanca',      category: 'health',     coord: [-70.9711, -31.7743] },
+  { name: 'Unimarc',                    category: 'market',     coord: [-70.9612, -31.7825] },
+  { name: 'Super Bodega aCuenta',       category: 'market',     coord: [-70.9621, -31.7820] },
+  { name: 'Supermercado Piolín',        category: 'market',     coord: [-70.9633, -31.7822] },
+  { name: 'Farmacia Jarufe',            category: 'pharmacy',   coord: [-70.9645, -31.7784] },
+  { name: 'Cruz Verde',                 category: 'pharmacy',   coord: [-70.9646, -31.7790] }
 ];
 
 /* ---------- POI REALES DESDE OPENSTREETMAP (Overpass API) ----------
@@ -693,22 +682,20 @@ const POI_PLACES = [
    para no dejar el mapa vacío. */
 const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
+/* Solo las 8 categorías relevantes para un viaje en Salamanca: hospital,
+   farmacia, municipalidad, terminal, banco, bomberos, supermercado y
+   plaza. Todo lo demás (iglesias, cafés, comida, bencineras, deporte,
+   turismo) queda fuera para no saturar el mapa. */
 function classifyOSMTags(tags) {
   if (!tags) return null;
   if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return 'health';
-  if (tags.amenity === 'townhall') return 'government';
-  if (tags.amenity === 'place_of_worship') return 'church';
-  if (tags.amenity === 'bus_station') return 'transport';
-  if (tags.amenity === 'cafe') return 'cafe';
-  if (tags.amenity === 'restaurant' || tags.amenity === 'fast_food') return 'food';
-  if (tags.amenity === 'fuel') return 'gas';
   if (tags.amenity === 'pharmacy') return 'pharmacy';
-  if (tags.amenity === 'marketplace') return 'market';
+  if (tags.amenity === 'townhall') return 'government';
+  if (tags.amenity === 'bus_station') return 'transport';
+  if (tags.amenity === 'bank') return 'bank';
+  if (tags.amenity === 'fire_station') return 'firestation';
   if (tags.shop === 'supermarket' || tags.shop === 'convenience' || tags.shop === 'department_store') return 'market';
- if (tags.leisure === 'stadium' || tags.leisure === 'sports_centre') return 'sports';
-  if (tags.leisure === 'fitness_centre' || tags.amenity === 'gym' || tags.sport === 'fitness') return 'gym';
   if (tags.leisure === 'square' || tags.place === 'square') return 'landmark';
-  if (tags.tourism === 'attraction' || tags.tourism === 'museum' || tags.historic) return 'landmark';
   return null;
 }
 
@@ -716,15 +703,12 @@ async function fetchOSMPOIs() {
   const [[minLon, minLat], [maxLon, maxLat]] = AREA_BOUNDS;
   const bbox = `${minLat},${minLon},${maxLat},${maxLon}`;
   const query = `[out:json][timeout:25];(
-node["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace|gym)$"](${bbox});
-way["amenity"~"^(hospital|clinic|townhall|place_of_worship|bus_station|cafe|restaurant|fast_food|fuel|pharmacy|marketplace|gym)$"](${bbox});
+node["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
+way["amenity"~"^(hospital|clinic|townhall|bus_station|pharmacy|bank|fire_station)$"](${bbox});
 node["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
 way["shop"~"^(supermarket|convenience|department_store)$"](${bbox});
-node["leisure"~"^(stadium|sports_centre|square|fitness_centre)$"](${bbox});
-way["leisure"~"^(stadium|sports_centre|square|fitness_centre)$"](${bbox});
+node["leisure"="square"](${bbox});
 node["place"="square"](${bbox});
-node["tourism"~"^(attraction|museum)$"](${bbox});
-way["tourism"~"^(attraction|museum)$"](${bbox});
 );
 out center tags;`;
 
@@ -771,8 +755,8 @@ function haversineMeters(a, b) {
 }
 
 const POI_CATEGORY_PRIORITY = {
-  health:0, pharmacy:1, gym:2, government:3, transport:4, church:5,
-  market:6, gas:7, sports:8, landmark:9, cafe:10, food:11
+  health:0, pharmacy:1, firestation:2, government:3, bank:4,
+  transport:5, market:6, landmark:7
 };
 
 function declutterPOIs(pois, minDistMeters = 90, maxTotal = 20) {
@@ -821,10 +805,13 @@ function poiIconInnerMarkup(category) {
 function buildPoiMarkerSVG(category, active) {
   const size = 64;
   const inner = poiIconInnerMarkup(category);
-  const stroke = active ? '#6EE7B7' : 'rgba(16,185,129,0.6)';
+  const stroke = active ? '#6EE7B7' : 'rgba(16,185,129,0.5)';
   const strokeW = active ? 2.6 : 1.8;
   const bg1 = active ? 'rgba(8,90,68,0.95)' : 'rgba(20,26,22,0.92)';
   const bg2 = active ? 'rgba(5,46,35,0.95)' : 'rgba(11,15,13,0.92)';
+  /* Verde esmeralda un punto más apagado en el estado normal (el
+     seleccionado se mantiene vívido para que siga destacando). */
+  const glyphColor = active ? '#10B981' : '#0EA173';
   const glow = active ? `<circle cx="32" cy="32" r="30" fill="none" stroke="#10B981" stroke-width="1.4" opacity="0.5"/>` : '';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
@@ -834,7 +821,7 @@ function buildPoiMarkerSVG(category, active) {
     </defs>
     ${glow}
     <circle cx="32" cy="32" r="26" fill="url(#poiBg-${category}-${active ? 'a' : 'n'})" stroke="${stroke}" stroke-width="${strokeW}"/>
-    <g transform="translate(18,18) scale(1.17)" fill="none" stroke="#10B981" style="color:#10B981">${inner}</g>
+    <g transform="translate(18,18) scale(1.17)" fill="none" stroke="${glyphColor}" style="color:${glyphColor}" opacity="${active ? 1 : 0.9}">${inner}</g>
   </svg>`;
 }
 
@@ -885,17 +872,18 @@ let selectedPoiId = null;
 let poiPopup = null;
 
 function clearPoiSelection() {
-  if (selectedPoiId !== null && map.getSource('pois')) {
-    map.setFeatureState({ source: 'pois', id: selectedPoiId }, { selected: false });
-  }
   selectedPoiId = null;
+  if (map.getSource('poi-selected')) {
+    map.getSource('poi-selected').setData({ type: 'FeatureCollection', features: [] });
+  }
   if (poiPopup) { poiPopup.remove(); poiPopup = null; }
 }
 
 function selectPOI(feature) {
-  clearPoiSelection();
   selectedPoiId = feature.id;
-  map.setFeatureState({ source: 'pois', id: selectedPoiId }, { selected: true });
+  if (map.getSource('poi-selected')) {
+    map.getSource('poi-selected').setData({ type: 'FeatureCollection', features: [feature] });
+  }
 
   const coords = feature.geometry.coordinates.slice();
   const name = feature.properties.name;
@@ -932,37 +920,85 @@ function addPOILayer(rawPois) {
   }
 
   map.addSource('pois', { type: 'geojson', data });
+  map.addSource('poi-selected', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
+  const sizeExpr = ['interpolate', ['linear'], ['zoom'], 11, 0.42, 14, 0.56, 17, 0.78];
+  const sizeExprActive = ['interpolate', ['linear'], ['zoom'], 11, 0.58, 14, 0.74, 17, 0.98];
+
+  /* Solo se ven siempre los POI clave (salud, gobierno, transporte, plaza,
+     bomberos); los "secundarios" (farmacia, banco, supermercado) quedan
+     ocultos hasta zoom 14, así el mapa alejado se siente limpio y con
+     espacio, y se llena de contexto solo al acercarse. */
+  const ESSENTIAL_POI = ['health', 'government', 'transport', 'landmark', 'firestation'];
+  const poiOpacityExpr = ['step', ['zoom'],
+    ['match', ['get', 'category'], ESSENTIAL_POI, 0.88, 0],
+    14, 0.88
+  ];
+
+  const textLayout = {
+    'text-field': ['get', 'name'],
+    'text-font': ['Noto Sans Regular'],
+    /* Nombres 25% más chicos que antes (10.5/12/13 -> 8/9/10) */
+    'text-size': ['interpolate', ['linear'], ['zoom'], 12, 8, 15, 9, 17, 10],
+    'text-offset': [0, 1.4],
+    'text-anchor': 'top',
+    'text-allow-overlap': false,
+    'text-optional': true,
+    'text-max-width': 8
+  };
+  const textPaint = {
+    /* Gris tenue en vez de casi blanco, para que el nombre no compita
+       visualmente con la ruta (verde esmeralda) ni el destino. */
+    'text-color': '#9FADA9',
+    'text-halo-color': 'rgba(6,9,12,0.85)',
+    'text-halo-width': 1,
+    'text-opacity': poiOpacityExpr
+  };
+  const iconPaint = { 'icon-opacity': poiOpacityExpr };
+
+  /* MapLibre no admite expresiones de feature-state en propiedades de
+     layout (icon-image, icon-size) — solo en paint. En vez de forzarlo
+     (lo que hacía que addLayer lanzara un error y NUNCA se creara la
+     capa), el POI "seleccionado" se resuelve con una segunda fuente
+     GeoJSON aparte que solo contiene el punto activo; sigue siendo 100%
+     nativo de MapLibre, solo que en dos capas en vez de una condicional. */
   map.addLayer({
     id: 'poi-layer', type: 'symbol', source: 'pois',
     layout: {
-      'icon-image': ['case',
-        ['boolean', ['feature-state', 'selected'], false],
-        ['concat', ['get', 'category'], '-active'],
-        ['get', 'category']
-      ],
-      'icon-size': ['case',
-        ['boolean', ['feature-state', 'selected'], false],
-        ['interpolate', ['linear'], ['zoom'], 11, 0.48, 14, 0.62, 17, 0.82],
-        ['interpolate', ['linear'], ['zoom'], 11, 0.34, 14, 0.44, 17, 0.6]
-      ],
+      'icon-image': ['get', 'category'],
+      'icon-size': sizeExpr,
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
-      'icon-anchor': 'center'
-    }
+      'icon-anchor': 'center',
+      ...textLayout
+    },
+    paint: { ...textPaint, ...iconPaint }
   });
 
-  /* Tap/click sobre un POI selecciona (feature-state) y abre el popup
-     nativo; tocar fuera de un POI limpia la selección. Se resuelve con
-     queryRenderedFeatures sobre el punto tocado — el mismo mecanismo con
-     el que MapLibre resuelve clics sobre cualquier otra capa del mapa. */
+  /* El POI seleccionado por el usuario (destino elegido) siempre se ve a
+     opacidad plena, sin filtro por zoom — fue una elección explícita. */
+  map.addLayer({
+    id: 'poi-selected-layer', type: 'symbol', source: 'poi-selected',
+    layout: {
+      'icon-image': ['concat', ['get', 'category'], '-active'],
+      'icon-size': sizeExprActive,
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+      'icon-anchor': 'center',
+      ...textLayout
+    },
+    paint: { ...textPaint, 'text-opacity': 1, 'icon-opacity': 1 }
+  });
+
   map.on('click', (e) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer'] });
+    const features = map.queryRenderedFeatures(e.point, { layers: ['poi-layer', 'poi-selected-layer'] });
     if (features.length) selectPOI(features[0]);
     else clearPoiSelection();
   });
-  map.on('mouseenter', 'poi-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
-  map.on('mouseleave', 'poi-layer', () => { map.getCanvas().style.cursor = ''; });
+  ['poi-layer', 'poi-selected-layer'].forEach(id => {
+    map.on('mouseenter', id, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', id, () => { map.getCanvas().style.cursor = ''; });
+  });
 }
 
 async function addPOIMarkers() {
@@ -1110,19 +1146,20 @@ function addRouteLayers() {
      destaca con claridad sobre el mapa sin verse exagerada. */
   map.addLayer({ id: 'route-glow', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 6, 16, 16],
-      'line-blur': 9, 'line-opacity': 0.16 } });
+    paint: { 'line-color': '#10B981', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 7, 16, 18],
+      'line-blur': 9, 'line-opacity': 0.2 } });
 
-  /* línea principal: nítida, sobre el halo */
+  /* línea principal: nítida, sobre el halo — un poco más gruesa para que
+     la ruta gane protagonismo frente a los POI (ahora más discretos). */
   map.addLayer({ id: 'route-line', type: 'line', source: 'route',
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.9, 16, 4.2],
-      'line-opacity': 0.95 } });
+    paint: { 'line-color': '#6EE7B7', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 2.3, 16, 4.8],
+      'line-opacity': 0.97 } });
 
   let breatheT = 0;
   setInterval(() => {
     breatheT += 0.04;
-    const v = 0.16 + Math.sin(breatheT) * 0.035;
+    const v = 0.2 + Math.sin(breatheT) * 0.04;
     if (map.getLayer('route-glow')) map.setPaintProperty('route-glow', 'line-opacity', v);
   }, 100);
 }
@@ -1340,8 +1377,6 @@ window.addEventListener('resize', () => {
    interno; una vez hecho eso, todas las capas (calles, ruta y POI) se
    redibujan correctamente por sí solas. */
 async function repositionPOIMarkers() {
-  const container = map.getContainer();
-  await waitForStableContainerSize(container);
   map.resize();
 }
 window.addEventListener('orientationchange', () => repositionPOIMarkers());
